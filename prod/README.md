@@ -1,6 +1,6 @@
 # Gói Triển Khai Production (1 Core CPU / 1GB RAM / 20GB Disk)
 
-Thư mục này chứa toàn bộ cấu hình, script tối ưu hóa và `docker-compose.yml` để chạy **16 Worker PIA SOCKS5 Proxy** ổn định trên máy chủ cấu hình tối thiểu (1 vCPU, 1GB RAM, 20GB Disk) với cơ chế **Zero-Leak Protection (tuyệt đối không rò rỉ IP máy chủ)**.
+Thư mục này chứa toàn bộ cấu hình, script tối ưu hóa và `docker-compose.yml` để chạy **20 Worker PIA SOCKS5 Proxy** ổn định trên máy chủ cấu hình tối thiểu (1 vCPU, 1GB RAM, 20GB Disk) với cơ chế **Zero-Leak Protection (tuyệt đối không rò rỉ IP máy chủ)**.
 
 ---
 
@@ -11,7 +11,7 @@ Thư mục này chứa toàn bộ cấu hình, script tối ưu hóa và `docker
 - **4GB Swap tự động:** Tận dụng 20GB Disk để nâng bộ nhớ ảo lên **5GB**, loại bỏ hoàn toàn nguy cơ tràn RAM (OOM Killer).
 - **Điều phối 1 CPU Core:**
   - Giới hạn `mem_limit` mỗi worker chỉ `120MB`.
-  - Khởi động so le (Staggered boot) chống quá tải lúc mở 16 đường hầm VPN.
+  - Khởi động so le (Staggered boot) chống quá tải lúc mở 20 đường hầm VPN.
 - **Log Rotation:** Giới hạn mỗi container tối đa 2MB log để không làm đầy ổ đĩa.
 
 ---
