@@ -681,13 +681,14 @@ class VPNManager:
 
     def _login_node_with_token(self, node: WorkerNode, token: str) -> dict[str, Any]:
         cli = self._login_with_token(node, token)
-        node_ok = cli.exit_code == 0 or (cli.exit_code == 127 and "already logged into account" in cli.output.lower())
+        output_lower = (cli.output or "").lower()
+        node_ok = cli.exit_code == 0 or "already logged" in output_lower or "logged into account" in output_lower
         return {
             "node_id": node.id,
             "token_slot": node.token_slot,
             "ok": node_ok,
             "exit_code": 0 if node_ok else cli.exit_code,
-            "raw": self._redact_sensitive(cli.output),
+            "raw": self._redact_sensitive(cli.output or ("Already logged into account" if node_ok else "Login failed")),
             "account_raw": "",
         }
 

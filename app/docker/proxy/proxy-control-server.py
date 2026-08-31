@@ -146,8 +146,10 @@ def run_pia_cli(args: list[str], *, timeout: int) -> tuple[int, str]:
             os.chmod(path, 0o600)
             result = run_command(["piactl", "login", path], timeout=timeout + 5)
             settle_if_needed()
-            if result[0] == 0:
+            output_lower = (result[1] or "").lower()
+            if result[0] == 0 or "already logged" in output_lower or is_account_logged_in():
                 save_account_session()
+                return 0, result[1] or "already logged into account"
             return result
         finally:
             try:

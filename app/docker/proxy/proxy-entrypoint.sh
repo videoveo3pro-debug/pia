@@ -173,8 +173,24 @@ start_dbus
 wait_for_cli
 start_control_api
 start_socks5
+auto_login_and_connect() {
+    local target="${PIA_STARTUP_TARGET:-random}"
+    if [[ -f "$PIA_ACCOUNT_PATH" && -s "$PIA_ACCOUNT_PATH" ]]; then
+        log "Attempting startup login using ${PIA_ACCOUNT_PATH}..."
+        timeout -k 2 35s flock -w 15 "${PIA_CLI_LOCK_PATH}" piactl login "$PIA_ACCOUNT_PATH" >/dev/null 2>&1 || true
+    fi
+    if [[ "${PIA_CONNECT_ON_STARTUP:-true}" == "true" ]]; then
+        log "Connecting PIA on startup (target: ${target})..."
+        if [[ -n "$target" && "$target" != "random" && "$target" != "__random__" && "$target" != "any" && "$target" != "all" ]]; then
+            timeout -k 2 20s flock -w 10 "${PIA_CLI_LOCK_PATH}" piactl set region "$target" >/dev/null 2>&1 || true
+        fi
+        timeout -k 2 35s flock -w 15 "${PIA_CLI_LOCK_PATH}" piactl connect >/dev/null 2>&1 || true
+    fi
+}
+
 start_pia_daemon
 enable_background_mode
+auto_login_and_connect
 
 log "PIA CLI + SOCKS5 proxy container is ready. Backend will call the internal proxy control API."
 
