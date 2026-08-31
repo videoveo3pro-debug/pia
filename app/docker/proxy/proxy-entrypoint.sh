@@ -42,6 +42,23 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+enable_killswitch() {
+    log "Applying strict VPN killswitch iptables rules..."
+    iptables -F OUTPUT 2>/dev/null || true
+    iptables -A OUTPUT -o lo -j ACCEPT 2>/dev/null || true
+    iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
+    iptables -A OUTPUT -d 10.0.0.0/8 -j ACCEPT 2>/dev/null || true
+    iptables -A OUTPUT -d 172.16.0.0/12 -j ACCEPT 2>/dev/null || true
+    iptables -A OUTPUT -d 192.168.0.0/16 -j ACCEPT 2>/dev/null || true
+    iptables -A OUTPUT -o wgpia+ -j ACCEPT 2>/dev/null || true
+    iptables -A OUTPUT -o tun+ -j ACCEPT 2>/dev/null || true
+    iptables -A OUTPUT -p udp --dport 53 -j ACCEPT 2>/dev/null || true
+    iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT 2>/dev/null || true
+    iptables -A OUTPUT -p udp -m multiport --dports 1194,1197,1198,8080,1337,51820 -j ACCEPT 2>/dev/null || true
+    iptables -A OUTPUT -p tcp -m multiport --dports 443,8443,1337 -j ACCEPT 2>/dev/null || true
+    iptables -A OUTPUT -o eth0 -j DROP 2>/dev/null || true
+}
+
 start_dbus() {
     if [[ ! -s /etc/machine-id ]] || ! grep -qE '^[0-9a-fA-F]{32}$' /etc/machine-id 2>/dev/null; then
         log "Generating missing D-Bus machine ID"
@@ -191,6 +208,7 @@ auto_login_and_connect() {
 start_pia_daemon
 enable_background_mode
 auto_login_and_connect
+enable_killswitch
 
 log "PIA CLI + SOCKS5 proxy container is ready. Backend will call the internal proxy control API."
 

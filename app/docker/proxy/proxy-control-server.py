@@ -341,7 +341,8 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/healthz":
             runtime = runtime_snapshot(include_status=False)
-            status = HTTPStatus.OK if runtime["service_ready"] else HTTPStatus.SERVICE_UNAVAILABLE
+            is_healthy = bool(runtime["service_ready"] and runtime["connected"])
+            status = HTTPStatus.OK if is_healthy else HTTPStatus.SERVICE_UNAVAILABLE
             self._send(runtime, status=status)
             return
         if parsed.path == "/runtime":

@@ -84,7 +84,8 @@ services:
             log global
             mode tcp
             option tcplog
-            timeout connect 3s
+            timeout queue 20s
+            timeout connect 20s
             timeout client 120s
             timeout server 120s
 
@@ -94,12 +95,13 @@ services:
 
         backend socks5_workers
             balance leastconn
-            option tcp-check
-            default-server init-addr last,libc,none resolvers docker_resolver check inter 5s fastinter 2s fall 2 rise 1 on-marked-down shutdown-sessions
+            option httpchk GET /healthz
+            http-check expect status 200
+            default-server init-addr last,libc,none resolvers docker_resolver check port 9000 inter 2s fastinter 1s fall 1 rise 1 on-marked-down shutdown-sessions
 
         EOF
         for i in $$(seq 1 "$$worker_count"); do
-          printf '    server worker%s vpn-worker-%s:1080 check\n' "$$i" "$$i" >>/tmp/haproxy.cfg
+          printf '    server worker%s vpn-worker-%s:1080 check port 9000\n' "$$i" "$$i" >>/tmp/haproxy.cfg
         done
         cat >>/tmp/haproxy.cfg <<'EOF'
         listen stats
