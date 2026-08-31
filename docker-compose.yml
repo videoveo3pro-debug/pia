@@ -89,7 +89,7 @@ services:
             balance roundrobin
             option httpchk GET /healthz
             http-check expect status 200
-            default-server init-addr last,libc,none resolvers docker_resolver check port 9000 inter 2s fastinter 1s fall 2 rise 2
+            default-server init-addr libc,last,none resolvers docker_resolver check port 9000 inter 2s fastinter 1s fall 2 rise 2
 
         EOF
         for i in $$(seq 1 "$$worker_count"); do
