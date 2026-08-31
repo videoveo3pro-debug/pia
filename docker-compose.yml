@@ -1,0 +1,340 @@
+x-vpn-worker: &vpn_worker
+  image: ${WORKER_IMAGE:-piactl-socks5-proxy:local}
+  env_file:
+    - .env
+  expose:
+    - "1080"
+    - "9000"
+  networks:
+    - pia_proxy_net
+  cap_add:
+    - NET_ADMIN
+    - NET_RAW
+    - SYS_PTRACE
+  devices:
+    - /dev/net/tun:/dev/net/tun:rwm
+  sysctls:
+    net.ipv6.conf.all.disable_ipv6: "0"
+  volumes:
+    - ./credentials:/app/credentials
+  restart: unless-stopped
+  mem_limit: 384m
+  healthcheck:
+    test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${PROXY_CONTROL_PORT:-9000}/healthz"]
+    interval: 20s
+    timeout: 4s
+    retries: 4
+    start_period: 30s
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "5m"
+      max-file: "2"
+
+services:
+  proxy-gateway:
+    image: haproxy:2.9
+    container_name: pia-proxy-gateway
+    user: "0:0"
+    mem_limit: 128m
+    command:
+      - sh
+      - -ec
+      - |
+        mkdir -p /run/haproxy
+        chmod 777 /run/haproxy
+        worker_count="$${WORKER_COUNT:-14}"
+        case "$$worker_count" in
+          ''|*[!0-9]*) worker_count=14 ;;
+          *)
+            if [ "$$worker_count" -gt 14 ]; then
+              worker_count=14
+            elif [ "$$worker_count" -lt 1 ]; then
+              worker_count=8
+            fi
+            ;;
+        esac
+        for i in $$(seq 1 "$$worker_count"); do
+          for _ in $$(seq 1 30); do
+            if getent hosts "vpn-worker-$$i" >/dev/null 2>&1; then
+              break
+            fi
+            sleep 0.5
+          done
+        done
+        cat >/tmp/haproxy.cfg <<'EOF'
+        global
+            log stdout format raw local0
+            stats socket /run/haproxy/admin.sock mode 666 level admin expose-fd listeners
+            maxconn 4096
+
+        resolvers docker_resolver
+            nameserver dns1 127.0.0.11:53
+            resolve_retries 3
+            timeout resolve 1s
+            timeout retry 1s
+            hold other 10s
+            hold refused 10s
+            hold nx 10s
+            hold timeout 10s
+            hold valid 10s
+            hold obsolete 10s
+
+        defaults
+            log global
+            mode tcp
+            option tcplog
+            timeout connect 3s
+            timeout client 120s
+            timeout server 120s
+
+        frontend socks5_gateway
+            bind *:1080
+            default_backend socks5_workers
+
+        backend socks5_workers
+            balance leastconn
+            option tcp-check
+            default-server init-addr last,libc,none resolvers docker_resolver check inter 3s fastinter 1s fall 2 rise 1 on-marked-down shutdown-sessions
+
+        EOF
+        for i in $$(seq 1 "$$worker_count"); do
+          printf '    server worker%s vpn-worker-%s:1080 check\n' "$$i" "$$i" >>/tmp/haproxy.cfg
+        done
+        cat >>/tmp/haproxy.cfg <<'EOF'
+        listen stats
+            bind *:8404
+            mode http
+            stats enable
+            stats uri /
+            stats refresh 5s
+        EOF
+        exec haproxy -W -db -f /tmp/haproxy.cfg
+    env_file:
+      - .env
+    environment:
+      WORKER_COUNT: ${WORKER_COUNT:-14}
+      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-14}
+    ports:
+      - "${PROXY_HOST:-127.0.0.1}:${PROXY_PORT:-1087}:1080"
+      - "127.0.0.1:${HAPROXY_STATS_PORT:-8411}:8404"
+    volumes:
+      - haproxy_runtime:/run/haproxy
+    networks:
+      - pia_proxy_net
+    depends_on:
+      vpn-worker-1:
+        condition: service_started
+      vpn-worker-2:
+        condition: service_started
+      vpn-worker-3:
+        condition: service_started
+      vpn-worker-4:
+        condition: service_started
+      vpn-worker-5:
+        condition: service_started
+      vpn-worker-6:
+        condition: service_started
+      vpn-worker-7:
+        condition: service_started
+      vpn-worker-8:
+        condition: service_started
+      vpn-worker-9:
+        condition: service_started
+      vpn-worker-10:
+        condition: service_started
+      vpn-worker-11:
+        condition: service_started
+      vpn-worker-12:
+        condition: service_started
+      vpn-worker-13:
+        condition: service_started
+      vpn-worker-14:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /run/haproxy/admin.sock"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  vpn-worker-1:
+    <<: *vpn_worker
+    build:
+      context: .
+      dockerfile: app/docker/proxy/Dockerfile
+    container_name: pia-worker-1
+    environment: &worker_env
+      WORKER_ID: worker1
+      TOKEN_SLOT: "1"
+      CREDENTIALS_CONTAINER_PATH: /app/credentials
+      PIA_ACCOUNT: ""
+      PIA_ACCOUNT_STORAGE_ENABLED: "true"
+      PIA_ACCOUNT_PATH: /app/credentials/pia_account_1
+      PROXY_LOG_PATH: /tmp/proxy-runtime.log
+      PROXY_CONTROL_PORT: ${PROXY_CONTROL_PORT:-9000}
+      SOCKS5_PORT: ${SOCKS5_PORT:-1080}
+      PIA_CONNECT_ON_STARTUP: ${PIA_CONNECT_ON_STARTUP:-true}
+      PIA_STARTUP_TARGET: ${WORKER_1_COUNTRY:-random}
+
+  vpn-worker-2:
+    <<: *vpn_worker
+    container_name: pia-worker-2
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker2
+      PIA_STARTUP_TARGET: ${WORKER_2_COUNTRY:-random}
+
+  vpn-worker-3:
+    <<: *vpn_worker
+    container_name: pia-worker-3
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker3
+      PIA_STARTUP_TARGET: ${WORKER_3_COUNTRY:-random}
+
+  vpn-worker-4:
+    <<: *vpn_worker
+    container_name: pia-worker-4
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker4
+      PIA_STARTUP_TARGET: ${WORKER_4_COUNTRY:-random}
+
+  vpn-worker-5:
+    <<: *vpn_worker
+    container_name: pia-worker-5
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker5
+      PIA_STARTUP_TARGET: ${WORKER_5_COUNTRY:-random}
+
+  vpn-worker-6:
+    <<: *vpn_worker
+    container_name: pia-worker-6
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker6
+      PIA_STARTUP_TARGET: ${WORKER_6_COUNTRY:-random}
+
+  vpn-worker-7:
+    <<: *vpn_worker
+    container_name: pia-worker-7
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker7
+      PIA_STARTUP_TARGET: ${WORKER_7_COUNTRY:-random}
+
+  vpn-worker-8:
+    <<: *vpn_worker
+    container_name: pia-worker-8
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker8
+      PIA_STARTUP_TARGET: ${WORKER_8_COUNTRY:-random}
+
+  vpn-worker-9:
+    <<: *vpn_worker
+    container_name: pia-worker-9
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker9
+      PIA_STARTUP_TARGET: ${WORKER_9_COUNTRY:-random}
+
+  vpn-worker-10:
+    <<: *vpn_worker
+    container_name: pia-worker-10
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker10
+      PIA_STARTUP_TARGET: ${WORKER_10_COUNTRY:-random}
+
+  vpn-worker-11:
+    <<: *vpn_worker
+    container_name: pia-worker-11
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker11
+      PIA_STARTUP_TARGET: ${WORKER_11_COUNTRY:-random}
+
+  vpn-worker-12:
+    <<: *vpn_worker
+    container_name: pia-worker-12
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker12
+      PIA_STARTUP_TARGET: ${WORKER_12_COUNTRY:-random}
+
+  vpn-worker-13:
+    <<: *vpn_worker
+    container_name: pia-worker-13
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker13
+      PIA_STARTUP_TARGET: ${WORKER_13_COUNTRY:-random}
+
+  vpn-worker-14:
+    <<: *vpn_worker
+    container_name: pia-worker-14
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker14
+      PIA_STARTUP_TARGET: ${WORKER_14_COUNTRY:-random}
+
+  backend:
+    image: ${BACKEND_IMAGE:-piactl-socks5-gateway:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pia-socks5-api
+    mem_limit: 512m
+    env_file:
+      - .env
+    environment:
+      CREDENTIALS_CONTAINER_PATH: /app/credentials
+      PIA_ACCOUNT: ""
+      PIA_ACCOUNT_STORAGE_ENABLED: "true"
+      PIA_ACCOUNT_PATH: /app/credentials/pia_account_1
+      PIA_ACCOUNT_PATH_2: /app/credentials/pia_account_2
+      PROXY_SERVICE_HOST: proxy-gateway
+      HAPROXY_RUNTIME_SOCKET: /run/haproxy/admin.sock
+      WORKER_COUNT: ${WORKER_COUNT:-14}
+      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-14}
+      PROXY_WORKERS: ${PROXY_WORKERS:-auto}
+      DOCKER_SOCKET_PATH: /var/run/docker.sock
+    ports:
+      - "127.0.0.1:${API_PORT:-8007}:8000"
+    volumes:
+      - ./credentials:/app/credentials
+      - haproxy_runtime:/run/haproxy
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - pia_proxy_net
+    depends_on:
+      proxy-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+networks:
+  pia_proxy_net:
+    name: ${DOCKER_NETWORK:-pia_proxy_net}
+
+volumes:
+  haproxy_runtime:

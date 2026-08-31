@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>API tối giản</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>API tối giản</h1>
+      <p>PIA CLI + 8/16/20 worker + HAProxy SOCKS5 gateway cố định.</p>
+    </div>
+    <nav><a href="/">Dashboard</a><a href="/docs">Swagger</a></nav>
+  </header>
+  <main class="container narrow">
+    <section class="panel">
+      <h2>Proxy</h2>
+      <pre class="logs small">socks5h://proxy_user:proxy_password@127.0.0.1:1087</pre>
+      <p>Dùng <code>socks5h://</code> để DNS cũng đi qua proxy.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Endpoint giữ lại</h2>
+      <pre class="logs small">GET  /api/status
+GET  /api/nodes
+GET  /api/nodes/healthy
+POST /api/nodes/{node_id}/rotate
+POST /api/nodes/{node_id}/recover
+POST /api/nodes/{node_id}/disable
+POST /api/nodes/{node_id}/enable
+POST /api/recover
+POST /api/rotate-any
+POST /api/sessions/{session_id}/rotate
+POST /api/login
+POST /api/connect
+POST /api/random-ip
+GET  /api/test-proxy
+GET  /api/logs?tail=120</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Login</h2>
+      <pre class="logs small">curl -X POST http://127.0.0.1:8007/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"token_1":"EMAIL_OR_USERNAME|PASSWORD","persist":true}'
+
+curl -X POST http://127.0.0.1:8007/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"token_1":"ACCOUNT_FOR_WORKER_1_TO_20","token_2":"OPTIONAL_SLOT_2","persist":true}'</pre>
+      <p>Mặc định dùng 1 account cho toàn bộ worker. Slot 2 chỉ dùng khi <code>PROXY_WORKERS</code> được cấu hình token_slot 2.</p>
+      <p>Backend đăng nhập PIA CLI trong worker. Có thể gửi account dạng <code>username|password</code> hoặc dùng field <code>username/password</code>.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Đổi IP mượt phía sau gateway</h2>
+      <pre class="logs small">curl -X POST http://127.0.0.1:8007/api/rotate-any \
+  -H "Content-Type: application/json" \
+  -d '{"wait_for_ready":false}'</pre>
+      <p>Backend disable worker khỏi HAProxy trước khi rotate, các worker còn lại vẫn phục vụ request mới.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Rotate đúng một container</h2>
+      <pre class="logs small">curl -X POST http://127.0.0.1:8007/api/nodes/worker1/rotate \
+  -H "Content-Type: application/json" \
+  -d '{"country":"Japan","wait_for_ready":false}'</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Tự phục hồi worker</h2>
+      <pre class="logs small">curl -X POST http://127.0.0.1:8007/api/recover \
+  -H "Content-Type: application/json" \
+  -d '{"force":false}'
+
+curl -X POST http://127.0.0.1:8007/api/nodes/worker1/recover \
+  -H "Content-Type: application/json" \
+  -d '{"force":true}'</pre>
+      <p>Watchdog cũng tự chạy mỗi <code>HEALTH_INTERVAL_SECONDS</code> giây, endpoint này dùng để kích hoạt thủ công.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Test proxy</h2>
+      <pre class="logs small">curl http://127.0.0.1:8007/api/test-proxy
+
+curl -x socks5h://proxy_user:proxy_password@127.0.0.1:1087 https://api.ipify.org?format=json</pre>
+    </section>
+  </main>
+</body>
+</html>

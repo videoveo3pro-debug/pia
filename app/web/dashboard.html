@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SOCKS5 PIA Gateway</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>SOCKS5 PIA Gateway</h1>
+      <p>Chế độ 8, 16 hoặc 20 worker, một SOCKS5 gateway cố định, rotate/failover cho request mới.</p>
+    </div>
+    <nav>
+      <a href="/api-docs">API</a>
+      <a href="/docs">Swagger</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div>
+        <span id="mainBadge" class="badge muted">Đang tải...</span>
+        <h2 id="mainTitle">Kiểm tra trạng thái...</h2>
+        <p id="mainSub">SOCKS5 cố định: <code id="proxyUrl">-</code></p>
+      </div>
+      <button id="refreshBtn" class="secondary">Refresh</button>
+    </section>
+
+    <section class="grid cards">
+      <article class="card">
+        <span class="label">IP hiện tại</span>
+        <strong id="currentIp">-</strong>
+        <small id="serverInfo">-</small>
+      </article>
+      <article class="card">
+        <span class="label">PIA</span>
+        <strong id="vpnState">-</strong>
+        <small id="vpnDetail">-</small>
+      </article>
+      <article class="card">
+        <span class="label">Chế độ</span>
+        <strong id="workerMode">-</strong>
+        <small id="workerModeDetail">-</small>
+      </article>
+    </section>
+
+
+    <section class="panel">
+      <div class="panel-head simple">
+        <div>
+          <h2>Worker pool</h2>
+          <p>Gateway chỉ route vào worker READY; worker DOWN sẽ tự reconnect/restart rồi enable lại khi IP OK.</p>
+        </div>
+        <button id="recoverBtn" class="secondary">Recover workers</button>
+      </div>
+      <div id="nodesBox" class="nodes-grid">Đang tải worker...</div>
+    </section>
+
+    <section class="panel step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="panel-head simple">
+          <div>
+            <h2>Chế độ chạy</h2>
+            <p>Chọn số lượng worker (8, 16 hoặc 20). Mỗi worker giữ một IP PIA độc lập.</p>
+          </div>
+          <span id="modeBadge" class="badge muted">Unknown</span>
+        </div>
+        <div class="form-row">
+          <select id="modeSelect">
+            <option value="8">8 worker</option>
+            <option value="16">16 worker</option>
+            <option value="20">20 worker</option>
+          </select>
+          <button id="modeBtn">Áp dụng chế độ</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="panel-head simple">
+          <div>
+            <h2>Quản lý account PIA</h2>
+            <p>Cập nhật account sẽ login lại các worker thuộc nhóm đó và kích hoạt recover.</p>
+          </div>
+          <span id="authBadge" class="badge muted">Unknown</span>
+        </div>
+        <div class="form-row">
+          <input id="tokenInput" type="password" placeholder="username|password - worker 1-20" autocomplete="off" />
+          <input id="tokenInput2" class="token-two hidden" type="password" placeholder="username|password - optional slot 2" autocomplete="off" />
+          <label class="check"><input id="persistToken" type="checkbox" checked /> Lưu account</label>
+          <button id="loginBtn">Cập nhật account</button>
+          <button id="logoutBtn" class="secondary">Logout</button>
+        </div>
+        <div class="hint">Nhập account dạng <code>username|password</code>. Backend đăng nhập bằng <code>piactl login</code> trong worker.</div>
+      </div>
+    </section>
+
+    <section class="panel step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="panel-head simple">
+          <div>
+            <h2>Đổi IP</h2>
+            <p>Random sẽ rotate một worker phía sau gateway; các worker khác vẫn phục vụ request mới.</p>
+          </div>
+        </div>
+        <div class="form-row">
+          <button id="randomBtn">Random IP</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head simple">
+          <div>
+            <h2>Test SOCKS5</h2>
+            <p>Kiểm tra proxy có ra IP PIA không.</p>
+          </div>
+          <button id="testBtn">Test</button>
+        </div>
+        <div id="testResult" class="result muted">Chưa test.</div>
+    </section>
+
+    <details class="panel">
+      <summary>Logs và debug</summary>
+      <div class="actions topgap">
+        <button id="logsBtn" class="secondary">Load logs</button>
+      </div>
+      <pre id="logsBox" class="logs">Chưa tải logs.</pre>
+    </details>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/static/app.js?v=20260711-fast-status-cache"></script>
+</body>
+</html>

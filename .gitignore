@@ -1,0 +1,14 @@
+.env
+credentials/*
+!credentials/.gitignore
+!credentials/.gitkeep
+prod/credentials/*
+!prod/credentials/.gitkeep
+__pycache__/
+*.pyc
+.DS_Store
+gateway/runtime/*
+!gateway/runtime/.gitignore
+!gateway/runtime/.gitkeep
+prod/gateway/runtime/*
+!prod/gateway/runtime/.gitkeep
