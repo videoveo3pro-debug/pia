@@ -192,19 +192,45 @@ start_control_api
 start_socks5
 auto_login_and_connect() {
     local target="${PIA_STARTUP_TARGET:-random}"
-    if [[ -f "$PIA_ACCOUNT_PATH" && -s "$PIA_ACCOUNT_PATH" ]]; then
-        log "Attempting startup login using ${PIA_ACCOUNT_PATH}..."
-        timeout -k 2 35s flock -w 15 "${PIA_CLI_LOCK_PATH}" piactl login "$PIA_ACCOUNT_PATH" >/dev/null 2>&1 || true
+    local is_logged_in=false
+    if [[ -f "/opt/piavpn/etc/account.json" ]] && grep -q '"loggedIn":true' "/opt/piavpn/etc/account.json" 2>/dev/null; then
+        is_logged_in=true
+        log "Account session is preloaded and active."
     fi
+
+    if [[ "$is_logged_in" != "true" && -f "$PIA_ACCOUNT_PATH" && -s "$PIA_ACCOUNT_PATH" ]]; then
+        log "Attempting startup login using ${PIA_ACCOUNT_PATH}..."
+        if timeout -k 2 45s flock -w 20 "${PIA_CLI_LOCK_PATH}" piactl login "$PIA_ACCOUNT_PATH" >/dev/null 2>&1; then
+            is_logged_in=true
+            if [[ -f "/opt/piavpn/etc/account.json" && -w "/app/credentials" ]]; then
+                cp /opt/piavpn/etc/account.json /app/credentials/pia_session_slot_1.json 2>/dev/null || true
+                chmod 600 /app/credentials/pia_session_slot_1.json 2>/dev/null || true
+            fi
+        fi
+    fi
+
     if [[ "${PIA_CONNECT_ON_STARTUP:-true}" == "true" ]]; then
         if [[ -n "$target" && "$target" != "random" && "$target" != "__random__" && "$target" != "any" && "$target" != "all" && "$target" != "auto" ]]; then
             timeout -k 2 20s flock -w 10 "${PIA_CLI_LOCK_PATH}" piactl set region "$target" >/dev/null 2>&1 || true
         else
-            local random_region
-            random_region=$(timeout -k 2 15s flock -w 10 "${PIA_CLI_LOCK_PATH}" piactl get regions 2>/dev/null | grep -v "^auto$" | shuf -n 1 || true)
-            if [[ -n "$random_region" ]]; then
-                timeout -k 2 20s flock -w 10 "${PIA_CLI_LOCK_PATH}" piactl set region "$random_region" >/dev/null 2>&1 || true
+            local fallback_regions=(
+                "us-california" "us-new-york" "us-chicago" "us-texas" "us-florida" "us-seattle" "us-atlanta" "us-denver" "us-virginia" "us-ohio"
+                "ca-ontario" "ca-toronto" "ca-vancouver" "ca-montreal" "uk-london" "uk-manchester" "germany" "france" "netherlands" "sweden"
+                "switzerland" "norway" "denmark" "finland" "austria" "belgium" "ireland" "italy" "spain" "poland"
+                "singapore" "japan" "taiwan" "south-korea" "australia" "au-sydney" "au-melbourne" "au-perth" "new-zealand" "brazil"
+                "mexico" "albania" "armenia" "cyprus" "czech-republic" "estonia" "georgia" "greece" "hungary" "iceland"
+                "india" "israel" "kazakhstan" "latvia" "lithuania" "luxembourg" "moldova" "monaco" "montenegro" "north-macedonia"
+                "portugal" "romania" "serbia" "slovakia" "slovenia" "south-africa" "turkey" "ukraine" "united-arab-emirates"
+            )
+            local target_region=""
+            if [[ -n "$worker_num" && "$worker_num" -gt 0 ]]; then
+                local idx=$(( (worker_num - 1) % ${#fallback_regions[@]} ))
+                target_region="${fallback_regions[$idx]}"
             fi
+            if [[ -z "$target_region" ]]; then
+                target_region=$(timeout -k 2 15s flock -w 10 "${PIA_CLI_LOCK_PATH}" piactl get regions 2>/dev/null | grep -v "^auto$" | shuf -n 1 || echo "singapore")
+            fi
+            timeout -k 2 20s flock -w 10 "${PIA_CLI_LOCK_PATH}" piactl set region "$target_region" >/dev/null 2>&1 || true
         fi
         timeout -k 2 35s flock -w 15 "${PIA_CLI_LOCK_PATH}" piactl connect >/dev/null 2>&1 || true
     fi
