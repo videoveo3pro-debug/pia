@@ -146,7 +146,7 @@ class Settings:
     auto_rotate_max_parallel_per_token: int = _int("AUTO_ROTATE_MAX_PARALLEL_PER_TOKEN", 2)
     auto_rotate_target_attempts: int = _int("AUTO_ROTATE_TARGET_ATTEMPTS", 2)
     auto_rotate_connect_timeout_seconds: int = _int("AUTO_ROTATE_CONNECT_TIMEOUT_SECONDS", 20)
-    auto_rotate_max_uptime_seconds: int = _int("AUTO_ROTATE_MAX_UPTIME_SECONDS", 600)
+    auto_rotate_max_uptime_seconds: int = _int("AUTO_ROTATE_MAX_UPTIME_SECONDS", 150)
     auto_rotate_country: str = os.getenv("AUTO_ROTATE_COUNTRY", "")
     auto_rotate_server: str = os.getenv("AUTO_ROTATE_SERVER", "")
 
