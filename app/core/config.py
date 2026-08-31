@@ -35,19 +35,14 @@ def _csv(name: str, default: str = "") -> list[str]:
 def _worker_count() -> int:
     value = (os.getenv("WORKER_COUNT") or os.getenv("WORKER_MODE") or "14").strip().lower()
     try:
-        iv = int(value)
-        if iv >= 14:
-            return 14
-        if iv >= 8:
-            return iv
-        return 8
+        return max(1, min(int(value), 50))
     except ValueError:
         pass
     return 14
 
 
 def _default_proxy_workers(count: int | None = None) -> str:
-    total = min(count or _int("MAX_WORKER_COUNT", 14), 14)
+    total = count or _int("MAX_WORKER_COUNT", _worker_count())
     workers = []
     for i in range(1, total + 1):
         country = os.getenv(f"WORKER_{i}_COUNTRY", "").strip()
@@ -119,7 +114,7 @@ class Settings:
     # Multi-worker gateway mode. PROXY_WORKERS format:
     # id:service_host:control_port:socks_port[:startup_country],...
     worker_count: int = _worker_count()
-    max_worker_count: int = min(_int("MAX_WORKER_COUNT", 14), 14)
+    max_worker_count: int = _int("MAX_WORKER_COUNT", _worker_count())
     proxy_workers_raw: str = _proxy_workers_raw()
     runtime_mode_path: Path = Path(os.getenv("RUNTIME_MODE_PATH", "/app/credentials/runtime_mode.json"))
     haproxy_runtime_socket: Path = Path(os.getenv("HAPROXY_RUNTIME_SOCKET", "/run/haproxy/admin.sock"))
