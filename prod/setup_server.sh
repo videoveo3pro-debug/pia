@@ -102,10 +102,10 @@ PROD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p "${PROD_DIR}/credentials" "${PROD_DIR}/gateway/runtime"
 chmod -R 777 "${PROD_DIR}/gateway/runtime"
 
-# 7. Tự động tạo sẵn file .env từ .env.example nếu chưa có
+# 7. Tự động tạo sẵn file .env từ .env.example nếu chưa có hoặc rỗng
 ENV_FILE="${PROD_DIR}/.env"
 ENV_EXAMPLE="${PROD_DIR}/.env.example"
-if [ ! -f "${ENV_FILE}" ]; then
+if [ ! -s "${ENV_FILE}" ]; then
     if [ -f "${ENV_EXAMPLE}" ]; then
         cp "${ENV_EXAMPLE}" "${ENV_FILE}"
         log_success "Đã tự động tạo sẵn file .env từ .env.example"
@@ -114,9 +114,9 @@ else
     log_info "File .env đã tồn tại sẵn, giữ nguyên."
 fi
 
-# 8. Tự động tạo sẵn file tài khoản PIA mẫu nếu chưa có
+# 8. Tự động tạo sẵn file tài khoản PIA mẫu nếu chưa có hoặc rỗng
 PIA_ACCOUNT_FILE="${PROD_DIR}/credentials/pia_account_1"
-if [ ! -f "${PIA_ACCOUNT_FILE}" ]; then
+if [ ! -s "${PIA_ACCOUNT_FILE}" ]; then
     cat << 'EOF' > "${PIA_ACCOUNT_FILE}"
 p1234567_CHANGE_ME
 your_password_CHANGE_ME
