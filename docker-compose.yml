@@ -53,6 +53,7 @@ services:
               worker_count=8
             fi
             ;;
+        esac
         cat >/tmp/haproxy.cfg <<'EOF'
         global
             log stdout format raw local0
