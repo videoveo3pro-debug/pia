@@ -33,12 +33,12 @@ def _csv(name: str, default: str = "") -> list[str]:
 
 
 def _worker_count() -> int:
-    value = (os.getenv("WORKER_COUNT") or os.getenv("WORKER_MODE") or "36").strip().lower()
+    value = (os.getenv("WORKER_COUNT") or os.getenv("WORKER_MODE") or "32").strip().lower()
     try:
         return max(1, min(int(value), 50))
     except ValueError:
         pass
-    return 36
+    return 32
 
 
 def _default_proxy_workers(count: int | None = None) -> str:
