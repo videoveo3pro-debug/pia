@@ -41,35 +41,34 @@ git push -u origin main
 ## 3. Hướng Dẫn Triển Khai Trên VPS (Server 1C/1G/20G)
 
 ### Bước 1: Sao chép thư mục `prod` lên server
-Bạn có thể clone git repo hoặc copy riêng thư mục `prod` lên server:
+Bạn có thể clone git repo hoặc copy thư mục `prod` lên server:
 ```bash
-cd /opt/pia-proxy/prod
+git clone https://github.com/videoveo3pro-debug/pia.git
+cd pia/prod
 ```
 
-### Bước 2: Chạy script tối ưu VPS (Tạo Swap & Kernel Sysctl)
+### Bước 2: Chạy script cài đặt & tối ưu VPS
 ```bash
 sudo bash setup_server.sh
 ```
-*Script sẽ tự động tạo 4GB Swap, cấu hình kernel sysctl, kiểm tra TUN device và chuẩn bị phân quyền.*
+*Script sẽ tự động:*
+- Tạo 4GB Swap và tối ưu Kernel Sysctl cho 1 Core CPU.
+- Tự động tạo sẵn file `credentials/pia_account_1` và file `.env` chuẩn.
 
-### Bước 3: Cấu hình tài khoản PIA
-Tạo file `credentials/pia_account_1`:
+### Bước 3: Mở file và điền tài khoản PIA
 ```bash
-cat << 'EOF' > credentials/pia_account_1
-p1234567
-your_password_here
-EOF
-chmod 600 credentials/pia_account_1
+nano credentials/pia_account_1
+```
+*(Điền Username ở dòng 1, Password ở dòng 2).*
+
+### Bước 4: (Tùy chọn) Chỉnh sửa SOCKS5 username/password trong `.env`
+```bash
+nano .env
 ```
 
-### Bước 4: Cập nhật biến môi trường `.env`
-Mở file `.env` và thay đổi:
-- `BACKEND_IMAGE`: Tên image GitHub của bạn (ví dụ `ghcr.io/username/pia-backend:latest`)
-- `WORKER_IMAGE`: Tên image Worker của bạn (ví dụ `ghcr.io/username/pia-worker:latest`)
-- `SOCKS5_USERNAME` & `SOCKS5_PASSWORD`: Thông tin đăng nhập Proxy SOCKS5.
-
-### Bước 5: Khởi động hệ thống
+### Bước 5: Khởi động toàn bộ 14 Worker
 ```bash
+docker compose pull
 docker compose up -d
 ```
 > [!NOTE]

@@ -102,7 +102,32 @@ PROD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p "${PROD_DIR}/credentials" "${PROD_DIR}/gateway/runtime"
 chmod -R 777 "${PROD_DIR}/gateway/runtime"
 
-# 7. Kiểm tra Docker & Docker Compose
+# 7. Tự động tạo sẵn file .env từ .env.example nếu chưa có
+ENV_FILE="${PROD_DIR}/.env"
+ENV_EXAMPLE="${PROD_DIR}/.env.example"
+if [ ! -f "${ENV_FILE}" ]; then
+    if [ -f "${ENV_EXAMPLE}" ]; then
+        cp "${ENV_EXAMPLE}" "${ENV_FILE}"
+        log_success "Đã tự động tạo sẵn file .env từ .env.example"
+    fi
+else
+    log_info "File .env đã tồn tại sẵn, giữ nguyên."
+fi
+
+# 8. Tự động tạo sẵn file tài khoản PIA mẫu nếu chưa có
+PIA_ACCOUNT_FILE="${PROD_DIR}/credentials/pia_account_1"
+if [ ! -f "${PIA_ACCOUNT_FILE}" ]; then
+    cat << 'EOF' > "${PIA_ACCOUNT_FILE}"
+p1234567_CHANGE_ME
+your_password_CHANGE_ME
+EOF
+    chmod 600 "${PIA_ACCOUNT_FILE}"
+    log_success "Đã tự động tạo sẵn file mẫu: credentials/pia_account_1"
+else
+    log_info "File credentials/pia_account_1 đã tồn tại sẵn, giữ nguyên."
+fi
+
+# 9. Kiểm tra Docker & Docker Compose
 log_info "Kiểm tra Docker Engine..."
 if ! command -v docker >/dev/null 2>&1; then
     log_warn "Chưa tìm thấy Docker! Bạn có thể cài đặt nhanh bằng lệnh:"
@@ -115,11 +140,14 @@ echo ""
 echo "=========================================================================="
 log_success "Hoàn tất thiết lập máy chủ!"
 echo "=========================================================================="
-echo "Các bước tiếp theo:"
-echo " 1. Đặt thông tin tài khoản PIA vào thư mục: ${PROD_DIR}/credentials/pia_account_1"
-echo "    (Dòng 1: Username, Dòng 2: Password)"
-echo " 2. Chỉnh sửa .env nếu muốn đổi SOCKS5 username/password:"
+echo "Các file cấu hình đã được tạo sẵn. Bạn chỉ cần sửa 2 file:"
+echo ""
+echo " 1. Nhập tài khoản PIA thật của bạn:"
+echo "    nano ${PROD_DIR}/credentials/pia_account_1"
+echo ""
+echo " 2. (Tùy chọn) Chỉnh sửa SOCKS5 username/password trong .env:"
 echo "    nano ${PROD_DIR}/.env"
-echo " 3. Khởi động hệ thống:"
-echo "    cd ${PROD_DIR} && docker compose up -d"
+echo ""
+echo " 3. Khởi động toàn bộ 14 Worker:"
+echo "    cd ${PROD_DIR} && docker compose pull && docker compose up -d"
 echo "=========================================================================="
