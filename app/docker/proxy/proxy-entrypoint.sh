@@ -197,9 +197,14 @@ auto_login_and_connect() {
         timeout -k 2 35s flock -w 15 "${PIA_CLI_LOCK_PATH}" piactl login "$PIA_ACCOUNT_PATH" >/dev/null 2>&1 || true
     fi
     if [[ "${PIA_CONNECT_ON_STARTUP:-true}" == "true" ]]; then
-        log "Connecting PIA on startup (target: ${target})..."
-        if [[ -n "$target" && "$target" != "random" && "$target" != "__random__" && "$target" != "any" && "$target" != "all" ]]; then
+        if [[ -n "$target" && "$target" != "random" && "$target" != "__random__" && "$target" != "any" && "$target" != "all" && "$target" != "auto" ]]; then
             timeout -k 2 20s flock -w 10 "${PIA_CLI_LOCK_PATH}" piactl set region "$target" >/dev/null 2>&1 || true
+        else
+            local random_region
+            random_region=$(timeout -k 2 15s flock -w 10 "${PIA_CLI_LOCK_PATH}" piactl get regions 2>/dev/null | grep -v "^auto$" | shuf -n 1 || true)
+            if [[ -n "$random_region" ]]; then
+                timeout -k 2 20s flock -w 10 "${PIA_CLI_LOCK_PATH}" piactl set region "$random_region" >/dev/null 2>&1 || true
+            fi
         fi
         timeout -k 2 35s flock -w 15 "${PIA_CLI_LOCK_PATH}" piactl connect >/dev/null 2>&1 || true
     fi
