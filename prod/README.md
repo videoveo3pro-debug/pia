@@ -1,16 +1,17 @@
 # Gói Triển Khai Production (1 Core CPU / 1GB RAM / 20GB Disk)
 
-Thư mục này chứa toàn bộ cấu hình, script tối ưu hóa và `docker-compose.yml` để chạy **tối đa 14 Worker PIA SOCKS5 Proxy** ổn định trên máy chủ cấu hình tối thiểu (1 vCPU, 1GB RAM, 20GB Disk).
+Thư mục này chứa toàn bộ cấu hình, script tối ưu hóa và `docker-compose.yml` để chạy **16 Worker PIA SOCKS5 Proxy** ổn định trên máy chủ cấu hình tối thiểu (1 vCPU, 1GB RAM, 20GB Disk) với cơ chế **Zero-Leak Protection (tuyệt đối không rò rỉ IP máy chủ)**.
 
 ---
 
 ## 1. Cơ Chế Tối Ưu Hóa Sẵn Có
 
+- **Zero-Leak VPN Protection:** Kiểm tra sức khỏe HAProxy nghiêm ngặt trên cổng 9000 (`/healthz` trả về 200 khi VPN Connected) kết hợp iptables killswitch trong từng container, loại bỏ 100% rủi ro lộ IP gốc máy chủ.
+- **Hàng đợi Delay Queue (tối đa 20s):** Nếu các Worker đang xoay IP, HAProxy sẽ giữ request trong hàng đợi chờ tối đa 20s cho đến khi đường truyền VPN sẵn sàng.
 - **4GB Swap tự động:** Tận dụng 20GB Disk để nâng bộ nhớ ảo lên **5GB**, loại bỏ hoàn toàn nguy cơ tràn RAM (OOM Killer).
 - **Điều phối 1 CPU Core:**
   - Giới hạn `mem_limit` mỗi worker chỉ `120MB`.
-  - Giãn tần suất Healthcheck / Watchdog lên `30s` - `45s` để không làm spike 100% CPU.
-  - Khởi động so le (Staggered boot) chống quá tải lúc mở 14 đường hầm VPN.
+  - Khởi động so le (Staggered boot) chống quá tải lúc mở 16 đường hầm VPN.
 - **Log Rotation:** Giới hạn mỗi container tối đa 2MB log để không làm đầy ổ đĩa.
 
 ---

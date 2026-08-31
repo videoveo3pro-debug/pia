@@ -115,8 +115,8 @@ services:
     env_file:
       - .env
     environment:
-      WORKER_COUNT: ${WORKER_COUNT:-14}
-      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-14}
+      WORKER_COUNT: ${WORKER_COUNT:-16}
+      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-16}
     ports:
       - "${PROXY_HOST:-127.0.0.1}:${PROXY_PORT:-1087}:1080"
       - "127.0.0.1:${HAPROXY_STATS_PORT:-8411}:8404"
@@ -320,8 +320,8 @@ services:
       PIA_ACCOUNT_PATH_2: /app/credentials/pia_account_2
       PROXY_SERVICE_HOST: proxy-gateway
       HAPROXY_RUNTIME_SOCKET: /run/haproxy/admin.sock
-      WORKER_COUNT: ${WORKER_COUNT:-14}
-      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-14}
+      WORKER_COUNT: ${WORKER_COUNT:-16}
+      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-16}
       PROXY_WORKERS: ${PROXY_WORKERS:-auto}
       DOCKER_SOCKET_PATH: /var/run/docker.sock
     ports:

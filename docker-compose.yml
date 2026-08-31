@@ -43,12 +43,12 @@ services:
       - |
         mkdir -p /run/haproxy
         chmod 777 /run/haproxy
-        worker_count="$${WORKER_COUNT:-14}"
+        worker_count="$${WORKER_COUNT:-16}"
         case "$$worker_count" in
-          ''|*[!0-9]*) worker_count=14 ;;
+          ''|*[!0-9]*) worker_count=16 ;;
           *)
-            if [ "$$worker_count" -gt 14 ]; then
-              worker_count=14
+            if [ "$$worker_count" -gt 16 ]; then
+              worker_count=16
             elif [ "$$worker_count" -lt 1 ]; then
               worker_count=8
             fi
@@ -84,7 +84,8 @@ services:
             log global
             mode tcp
             option tcplog
-            timeout connect 3s
+            timeout queue 20s
+            timeout connect 20s
             timeout client 120s
             timeout server 120s
 
@@ -94,12 +95,13 @@ services:
 
         backend socks5_workers
             balance leastconn
-            option tcp-check
-            default-server init-addr last,libc,none resolvers docker_resolver check inter 3s fastinter 1s fall 2 rise 1 on-marked-down shutdown-sessions
+            option httpchk GET /healthz
+            http-check expect status 200
+            default-server init-addr last,libc,none resolvers docker_resolver check port 9000 inter 2s fastinter 1s fall 1 rise 1 on-marked-down shutdown-sessions
 
         EOF
         for i in $$(seq 1 "$$worker_count"); do
-          printf '    server worker%s vpn-worker-%s:1080 check\n' "$$i" "$$i" >>/tmp/haproxy.cfg
+          printf '    server worker%s vpn-worker-%s:1080 check port 9000\n' "$$i" "$$i" >>/tmp/haproxy.cfg
         done
         cat >>/tmp/haproxy.cfg <<'EOF'
         listen stats
@@ -113,8 +115,8 @@ services:
     env_file:
       - .env
     environment:
-      WORKER_COUNT: ${WORKER_COUNT:-14}
-      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-14}
+      WORKER_COUNT: ${WORKER_COUNT:-16}
+      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-16}
     ports:
       - "${PROXY_HOST:-127.0.0.1}:${PROXY_PORT:-1087}:1080"
       - "127.0.0.1:${HAPROXY_STATS_PORT:-8411}:8404"
@@ -150,6 +152,10 @@ services:
       vpn-worker-13:
         condition: service_started
       vpn-worker-14:
+        condition: service_started
+      vpn-worker-15:
+        condition: service_started
+      vpn-worker-16:
         condition: service_started
     restart: unless-stopped
     healthcheck:
@@ -287,6 +293,22 @@ services:
       WORKER_ID: worker14
       PIA_STARTUP_TARGET: ${WORKER_14_COUNTRY:-random}
 
+  vpn-worker-15:
+    <<: *vpn_worker
+    container_name: pia-worker-15
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker15
+      PIA_STARTUP_TARGET: ${WORKER_15_COUNTRY:-random}
+
+  vpn-worker-16:
+    <<: *vpn_worker
+    container_name: pia-worker-16
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker16
+      PIA_STARTUP_TARGET: ${WORKER_16_COUNTRY:-random}
+
   backend:
     image: ${BACKEND_IMAGE:-piactl-socks5-gateway:local}
     build:
@@ -304,8 +326,8 @@ services:
       PIA_ACCOUNT_PATH_2: /app/credentials/pia_account_2
       PROXY_SERVICE_HOST: proxy-gateway
       HAPROXY_RUNTIME_SOCKET: /run/haproxy/admin.sock
-      WORKER_COUNT: ${WORKER_COUNT:-14}
-      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-14}
+      WORKER_COUNT: ${WORKER_COUNT:-16}
+      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-16}
       PROXY_WORKERS: ${PROXY_WORKERS:-auto}
       DOCKER_SOCKET_PATH: /var/run/docker.sock
     ports:

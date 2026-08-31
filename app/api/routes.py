@@ -27,7 +27,7 @@ class LoginRequest(BaseModel):
 
 
 class ModeRequest(BaseModel):
-    worker_count: int = Field(..., ge=1, le=14, description="Active workers (1-14).")
+    worker_count: int = Field(..., ge=1, le=50, description="Active workers (1-50).")
 
 
 class TokenUpdateRequest(BaseModel):
