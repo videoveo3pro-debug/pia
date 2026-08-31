@@ -43,12 +43,12 @@ services:
       - |
         mkdir -p /run/haproxy
         chmod 777 /run/haproxy
-        worker_count="$${WORKER_COUNT:-14}"
+        worker_count="$${WORKER_COUNT:-16}"
         case "$$worker_count" in
-          ''|*[!0-9]*) worker_count=14 ;;
+          ''|*[!0-9]*) worker_count=16 ;;
           *)
-            if [ "$$worker_count" -gt 24 ]; then
-              worker_count=24
+            if [ "$$worker_count" -gt 16 ]; then
+              worker_count=16
             elif [ "$$worker_count" -lt 1 ]; then
               worker_count=8
             fi
@@ -154,22 +154,6 @@ services:
       vpn-worker-15:
         condition: service_started
       vpn-worker-16:
-        condition: service_started
-      vpn-worker-17:
-        condition: service_started
-      vpn-worker-18:
-        condition: service_started
-      vpn-worker-19:
-        condition: service_started
-      vpn-worker-20:
-        condition: service_started
-      vpn-worker-21:
-        condition: service_started
-      vpn-worker-22:
-        condition: service_started
-      vpn-worker-23:
-        condition: service_started
-      vpn-worker-24:
         condition: service_started
     restart: unless-stopped
     healthcheck:
@@ -319,70 +303,6 @@ services:
       <<: *worker_env
       WORKER_ID: worker16
       PIA_STARTUP_TARGET: ${WORKER_16_COUNTRY:-random}
-
-  vpn-worker-17:
-    <<: *vpn_worker
-    container_name: pia-worker-17
-    environment:
-      <<: *worker_env
-      WORKER_ID: worker17
-      PIA_STARTUP_TARGET: ${WORKER_17_COUNTRY:-random}
-
-  vpn-worker-18:
-    <<: *vpn_worker
-    container_name: pia-worker-18
-    environment:
-      <<: *worker_env
-      WORKER_ID: worker18
-      PIA_STARTUP_TARGET: ${WORKER_18_COUNTRY:-random}
-
-  vpn-worker-19:
-    <<: *vpn_worker
-    container_name: pia-worker-19
-    environment:
-      <<: *worker_env
-      WORKER_ID: worker19
-      PIA_STARTUP_TARGET: ${WORKER_19_COUNTRY:-random}
-
-  vpn-worker-20:
-    <<: *vpn_worker
-    container_name: pia-worker-20
-    environment:
-      <<: *worker_env
-      WORKER_ID: worker20
-      PIA_STARTUP_TARGET: ${WORKER_20_COUNTRY:-random}
-
-  vpn-worker-21:
-    <<: *vpn_worker
-    container_name: pia-worker-21
-    environment:
-      <<: *worker_env
-      WORKER_ID: worker21
-      PIA_STARTUP_TARGET: ${WORKER_21_COUNTRY:-random}
-
-  vpn-worker-22:
-    <<: *vpn_worker
-    container_name: pia-worker-22
-    environment:
-      <<: *worker_env
-      WORKER_ID: worker22
-      PIA_STARTUP_TARGET: ${WORKER_22_COUNTRY:-random}
-
-  vpn-worker-23:
-    <<: *vpn_worker
-    container_name: pia-worker-23
-    environment:
-      <<: *worker_env
-      WORKER_ID: worker23
-      PIA_STARTUP_TARGET: ${WORKER_23_COUNTRY:-random}
-
-  vpn-worker-24:
-    <<: *vpn_worker
-    container_name: pia-worker-24
-    environment:
-      <<: *worker_env
-      WORKER_ID: worker24
-      PIA_STARTUP_TARGET: ${WORKER_24_COUNTRY:-random}
 
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/videoveo3pro-debug/pia-backend:latest}
