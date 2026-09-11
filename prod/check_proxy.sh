@@ -84,7 +84,7 @@ for r in range(1, 6):
     try:
         res = subprocess.run(
             ["curl", "-s", "-m", "8", "-x", f"socks5h://{PROXY_USER}:{PROXY_PASS}@127.0.0.1:{PROXY_PORT}", "https://api.ipify.org"],
-            capture_output=True, text=True, timeout=10
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=10
         )
         out_ip = res.stdout.strip()
         if res.returncode == 0 and out_ip and "." in out_ip:
