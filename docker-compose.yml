@@ -1,5 +1,7 @@
 x-vpn-worker: &vpn_worker
   image: ${WORKER_IMAGE:-piactl-socks5-proxy:local}
+  security_opt:
+    - apparmor:unconfined
   env_file:
     - .env
   expose:
@@ -18,13 +20,7 @@ x-vpn-worker: &vpn_worker
   volumes:
     - ./credentials:/app/credentials
   restart: unless-stopped
-  mem_limit: 384m
-  healthcheck:
-    test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${PROXY_CONTROL_PORT:-9000}/healthz"]
-    interval: 20s
-    timeout: 4s
-    retries: 4
-    start_period: 30s
+  mem_limit: 120m
   logging:
     driver: "json-file"
     options:
@@ -87,13 +83,11 @@ services:
 
         backend socks5_workers
             balance roundrobin
-            option httpchk GET /healthz
-            http-check expect status 200
-            default-server init-addr libc,last,none resolvers docker_resolver check port 9000 inter 2s fastinter 1s fall 2 rise 2
+            default-server init-addr libc,last,none resolvers docker_resolver check port 1080 inter 5s fastinter 2s downinter 3s rise 1 fall 2
 
         EOF
         for i in $$(seq 1 "$$worker_count"); do
-          printf '    server worker%s vpn-worker-%s:1080 check port 9000\n' "$$i" "$$i" >>/tmp/haproxy.cfg
+          printf '    server worker%s vpn-worker-%s:1080 check port 1080\n' "$$i" "$$i" >>/tmp/haproxy.cfg
         done
         cat >>/tmp/haproxy.cfg <<'EOF'
         listen stats

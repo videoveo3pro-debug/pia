@@ -78,6 +78,7 @@ class VPNManager:
         self.nodes = self._load_workers()
         self._locks: dict[str, RLock] = {node.id: RLock() for node in self.nodes}
         self._last_rotation_at: dict[str, float] = {}
+        self._node_ready_since: dict[str, float] = {}
         self._node_status_cache: dict[str, dict[str, Any]] = {}
         self._node_status_cache_at: dict[str, float] = {}
         self._fail_counts: dict[str, int] = {node.id: 0 for node in self.nodes}
@@ -447,7 +448,7 @@ class VPNManager:
         runtime: dict[str, Any] | None = None
         runtime_error: str | None = None
         try:
-            runtime = self._worker_request(node, "GET", "/runtime", timeout=min(1.5, self.settings.proxy_control_timeout_seconds))
+            runtime = self._worker_request(node, "GET", "/runtime", timeout=min(3.0, self.settings.proxy_control_timeout_seconds))
         except Exception as exc:
             runtime_error = str(exc)
         vpn = ExpressStatus(connected=False, raw="")
@@ -507,8 +508,8 @@ class VPNManager:
             "actual_server": vpn.actual_server,
             "technology": vpn.technology,
             "protocol": vpn.protocol,
-            "uptime": vpn.uptime,
-            "uptime_seconds": vpn.uptime_seconds,
+            "uptime": f"{max(0, int(time.time() - (self._last_rotation_at.get(node.id) or self._node_ready_since.setdefault(node.id, time.time()))))}s" if ready else None,
+            "uptime_seconds": max(0, int(time.time() - (self._last_rotation_at.get(node.id) or self._node_ready_since.setdefault(node.id, time.time())))) if ready else None,
             "current_ip": current_ip,
             "ip_error": ip_error,
             "latency_ms": latency_ms,
@@ -903,67 +904,60 @@ class VPNManager:
             return {"ok": True, "mode": "auto_rotate_disabled", "completed": completed} if completed else None
         active_nodes = [n for n in nodes if n.get("active")]
         recovering_ids = set(self._recovery_running_ids())
+        running_ids = set(self._auto_rotate_running_ids())
         ready = [n for n in active_nodes if n.get("ready") and n.get("id") not in recovering_ids]
+        ready_available = [n for n in ready if n.get("id") not in running_ids]
         min_ready = self._auto_rotate_ready_floor(len(active_nodes))
         pause_threshold = max(min_ready, int(self.settings.auto_rotate_pause_ready_threshold))
-        running_ids = self._auto_rotate_running_ids()
         now = time.time()
         max_uptime = max(0, int(self.settings.auto_rotate_max_uptime_seconds))
         uptime_due = [
             n
-            for n in ready
-            if n["id"] not in running_ids
-            and max_uptime
-            and int(n.get("uptime_seconds") or 0) >= max_uptime
+            for n in ready_available
+            if max_uptime and int(n.get("uptime_seconds") or 0) >= max_uptime
         ]
-        force_uptime_rotate = bool(uptime_due)
-        if len(ready) <= pause_threshold and not force_uptime_rotate:
-            if completed or running_ids:
-                return {
-                    "ok": True,
-                    "mode": "auto_rotate_paused_capacity",
-                    "ready_workers": len(ready),
-                    "auto_rotate_min_ready_workers": min_ready,
-                    "pause_threshold": pause_threshold,
-                    "running": running_ids,
-                    "recovery_running": sorted(recovering_ids),
-                    "completed": completed,
-                }
-            return None
+        schedule_due = [
+            n
+            for n in ready_available
+            if (self._next_auto_rotate_at.get(n["id"]) or 0) <= now
+        ]
+        if not uptime_due and not schedule_due:
+            return {"ok": True, "mode": "auto_rotate_collect", "running": sorted(running_ids), "recovery_running": sorted(recovering_ids), "completed": completed} if completed or running_ids else None
+
         token_slots = self._required_token_slots()
         per_token_parallel = max(1, int(self.settings.auto_rotate_max_parallel_per_token))
         max_parallel = min(
             max(1, int(self.settings.auto_rotate_max_parallel)),
             max(1, len(token_slots)) * per_token_parallel,
         )
-        available_slots = max_parallel - len(running_ids) if force_uptime_rotate else min(max_parallel - len(running_ids), len(ready) - pause_threshold)
+        # Guarantee HAProxy pool NEVER drops below min_ready (20) active workers
+        max_capacity_slots = max(0, len(ready_available) - min_ready)
+        available_slots = min(max(0, max_parallel - len(running_ids)), max_capacity_slots)
         if available_slots <= 0:
             if completed or running_ids:
                 return {
                     "ok": True,
-                    "mode": "auto_rotate_waiting_for_running_jobs",
-                    "running": running_ids,
+                    "mode": "auto_rotate_paused_capacity" if max_capacity_slots <= 0 else "auto_rotate_waiting_for_running_jobs",
+                    "ready_workers": len(ready_available),
+                    "auto_rotate_min_ready_workers": min_ready,
+                    "pause_threshold": pause_threshold,
+                    "running": sorted(running_ids),
                     "recovery_running": sorted(recovering_ids),
                     "completed": completed,
                     "max_parallel": max_parallel,
-                    "auto_rotate_min_ready_workers": min_ready,
                 }
             return None
-        schedule_due = [n for n in ready if n["id"] not in running_ids and (self._next_auto_rotate_at.get(n["id"]) or 0) <= now]
-        if not uptime_due and not schedule_due:
-            return {"ok": True, "mode": "auto_rotate_collect", "running": running_ids, "recovery_running": sorted(recovering_ids), "completed": completed} if completed or running_ids else None
+
         uptime_due_ids = {n["id"] for n in uptime_due}
         schedule_due_ids = {n["id"] for n in schedule_due}
         due_ids = uptime_due_ids | schedule_due_ids
-        eligible = uptime_due if force_uptime_rotate else [n for n in ready if n["id"] not in running_ids]
+        eligible = [n for n in ready_available if n["id"] in due_ids]
         eligible.sort(
             key=lambda item: (
                 0 if item["id"] in uptime_due_ids else 1,
                 -(int(item.get("uptime_seconds") or 0)),
-                0 if item["id"] in due_ids else 1,
                 self._last_rotation_at.get(item["id"], 0) or 0,
                 self._next_auto_rotate_at.get(item["id"], 0),
-                self._rotation_counts.get(item["id"], 0),
                 item["id"],
             )
         )
@@ -1030,7 +1024,7 @@ class VPNManager:
                 "uptime_due_workers": sorted(uptime_due_ids),
                 "schedule_due_workers": sorted(schedule_due_ids),
                 "auto_rotate_max_uptime_seconds": max_uptime,
-                "force_uptime_rotate": force_uptime_rotate,
+                "force_uptime_rotate": bool(uptime_due),
                 "available_slots": available_slots,
                 "max_parallel": max_parallel,
                 "auto_rotate_min_ready_workers": min_ready,
@@ -1102,7 +1096,7 @@ class VPNManager:
                     node_id,
                     country=target if not server else None,
                     server=server,
-                    wait_for_ready=False,
+                    wait_for_ready=True,
                     require_new_ip=True,
                     connect_timeout_seconds=self.settings.auto_rotate_connect_timeout_seconds,
                     retry_after_disconnect=False,
@@ -1211,16 +1205,16 @@ class VPNManager:
             target = server or country or node.country_hint or None
             target_key = self._normalize_country_key(country if country else (None if server else target))
             standby_promotion = None
-            ready_before = [n for n in self.nodes_status(refresh=True) if n.get("active") and n.get("ready") and n.get("id") != node.id]
+            ready_count = sum(1 for n in self._active_nodes() if self._ready_state.get(n.id) and n.id != node.id)
             min_ready = self._effective_min_ready_workers() if min_ready_workers is None else max(0, int(min_ready_workers))
-            if len(ready_before) < min_ready:
+            if ready_count < min_ready:
                 return {
                     "ok": False,
                     "node_id": node.id,
                     "old_ip": old_ip,
                     "current_ip": old_ip,
                     "target": target or "quick-connect",
-                    "error": f"Refusing to rotate because current mode requires at least {min_ready} READY workers.",
+                    "error": f"Refusing to rotate because current mode requires at least {min_ready} READY workers (currently {ready_count}).",
                     "gateway_reenabled": True,
                 }
             self._disable_node(node, reason="rotate_start")
@@ -1244,10 +1238,9 @@ class VPNManager:
                 ip = None
                 ip_error = None
                 if wait_for_ready:
-                    ip, wait_ms, ip_error = self._wait_for_verified_ip(node)
+                    ip, wait_ms, ip_error = self._wait_for_verified_ip(node, max_seconds=min(self.settings.connect_timeout_seconds, connect_timeout_seconds or self.settings.connect_timeout_seconds))
                 else:
-                    # Short wait for smooth API response, background health_tick will re-enable later if not ready yet.
-                    ip, wait_ms, ip_error = self._wait_for_verified_ip(node, max_seconds=min(8, self.settings.connect_timeout_seconds))
+                    ip, wait_ms, ip_error = self._wait_for_verified_ip(node, max_seconds=min(20, self.settings.connect_timeout_seconds))
                 if not ip:
                     last_error = ip_error or "No verified IP returned."
                     raise RuntimeError(f"{node.id} connected but IP verification failed: {last_error}")
@@ -1255,7 +1248,22 @@ class VPNManager:
                     last_error = f"IP did not change: {ip}"
                     raise RuntimeError(last_error)
                 vpn = ExpressStatus(connected=True, raw="", country=country or node.country_hint or None, server=target)
-                self._last_rotation_at[node.id] = time.time()
+                now_ts = time.time()
+                self._last_rotation_at[node.id] = now_ts
+                self._node_ready_since[node.id] = now_ts
+                self._ready_state[node.id] = True
+                self._last_verified_ip[node.id] = ip
+                self._last_verified_at[node.id] = now_ts
+                self._ready_success_streaks[node.id] = self._ready_success_streaks.get(node.id, 0) + 1
+                self._ready_failure_streaks[node.id] = 0
+                self._fail_counts[node.id] = 0
+                if node.id in self._node_status_cache:
+                    self._node_status_cache[node.id]["ready"] = True
+                    self._node_status_cache[node.id]["connected"] = True
+                    self._node_status_cache[node.id]["verified"] = True
+                    self._node_status_cache[node.id]["current_ip"] = ip
+                    self._node_status_cache[node.id]["uptime"] = "0s"
+                    self._node_status_cache[node.id]["uptime_seconds"] = 0
                 self._record_country_result(target_key, ok=True, error=None)
                 self._record_server_result(vpn.actual_server, ok=True, error=None)
                 self._enable_node(node, reason="rotate_success")
@@ -1379,16 +1387,16 @@ class VPNManager:
             def add_action(name: str, result: dict[str, Any]) -> None:
                 actions.append({"action": name, **result})
 
-            # If the worker control API/runtime is broken, restart immediately. A dead control API
-            # is more disruptive than a temporary VPN disconnect and usually needs a stronger reset.
+            # If the worker control API/runtime is broken, restart control process.
             if force or not status.get("service_ready"):
                 restart = self._restart_worker_control(node)
                 add_action("worker_control_restart", restart)
-                if not restart.get("ok") or not self.node_status(node.id).get("service_ready"):
-                    add_action("docker_restart", self._docker_restart_container(node))
+                if self.settings.docker_recovery_enabled and fail_count >= int(self.settings.worker_recovery_docker_restart_after_failures):
+                    if not restart.get("ok") or not self.node_status(node.id).get("service_ready"):
+                        add_action("docker_restart", self._docker_restart_container(node))
 
-            # If the control API is unreachable for many ticks, fall back to Docker restart.
-            if (force or fail_count >= int(self.settings.worker_recovery_docker_restart_after_failures)) and not actions:
+            # If the control API is unreachable for many ticks, fall back to Docker restart if enabled.
+            if self.settings.docker_recovery_enabled and (force or fail_count >= int(self.settings.worker_recovery_docker_restart_after_failures)) and not actions:
                 latest_runtime_ok = False
                 try:
                     latest_runtime_ok = bool(self._worker_request(node, "GET", "/runtime", timeout=3).get("service_ready"))
@@ -1421,12 +1429,13 @@ class VPNManager:
                     "actions": actions,
                 }
             else:
+                self._fail_counts[node.id] = 0
                 self._disable_node(node, reason="recovery_still_not_ready")
                 result = {
                     "ok": False,
                     "node_id": node.id,
                     "ready": False,
-                    "fail_count": self._fail_counts.get(node.id, fail_count),
+                    "fail_count": 0,
                     "final_error": final.get("runtime_error") or final.get("ip_error") or "worker is still not ready",
                     "actions": actions,
                 }

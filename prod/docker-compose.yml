@@ -1,5 +1,7 @@
 x-vpn-worker: &vpn_worker
   image: ${WORKER_IMAGE:-ghcr.io/videoveo3pro-debug/pia-worker:latest}
+  security_opt:
+    - apparmor:unconfined
   env_file:
     - .env
   expose:
@@ -19,12 +21,6 @@ x-vpn-worker: &vpn_worker
     - ./credentials:/app/credentials
   restart: unless-stopped
   mem_limit: 120m
-  healthcheck:
-    test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${PROXY_CONTROL_PORT:-9000}/healthz"]
-    interval: 30s
-    timeout: 5s
-    retries: 4
-    start_period: 40s
   logging:
     driver: "json-file"
     options:
@@ -87,13 +83,11 @@ services:
 
         backend socks5_workers
             balance roundrobin
-            option httpchk GET /healthz
-            http-check expect status 200
-            default-server init-addr libc,last,none resolvers docker_resolver check port 9000 inter 2s fastinter 1s fall 2 rise 2
+            default-server init-addr libc,last,none resolvers docker_resolver check port 1080 inter 5s fastinter 2s downinter 3s rise 1 fall 2
 
         EOF
         for i in $$(seq 1 "$$worker_count"); do
-          printf '    server worker%s vpn-worker-%s:1080 check port 9000\n' "$$i" "$$i" >>/tmp/haproxy.cfg
+          printf '    server worker%s vpn-worker-%s:1080 check port 1080\n' "$$i" "$$i" >>/tmp/haproxy.cfg
         done
         cat >>/tmp/haproxy.cfg <<'EOF'
         listen stats
@@ -110,8 +104,8 @@ services:
       WORKER_COUNT: ${WORKER_COUNT:-32}
       MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-32}
     ports:
-      - "${PROXY_HOST:-127.0.0.1}:${PROXY_PORT:-1087}:1080"
-      - "127.0.0.1:${HAPROXY_STATS_PORT:-8411}:8404"
+      - "${PROXY_HOST:-0.0.0.0}:${PROXY_PORT:-1087}:1080"
+      - "${PROXY_HOST:-0.0.0.0}:${HAPROXY_STATS_PORT:-8411}:8404"
     volumes:
       - haproxy_runtime:/run/haproxy
     networks:
@@ -477,9 +471,10 @@ services:
       PROXY_WORKERS: ${PROXY_WORKERS:-auto}
       DOCKER_SOCKET_PATH: /var/run/docker.sock
     ports:
-      - "127.0.0.1:${API_PORT:-8007}:8000"
+      - "${PROXY_HOST:-0.0.0.0}:${API_PORT:-8007}:8000"
     volumes:
       - ./credentials:/app/credentials
+      - ../app:/app/app:ro
       - haproxy_runtime:/run/haproxy
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
