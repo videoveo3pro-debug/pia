@@ -33,20 +33,20 @@ print("=" * 75)
 
 print("\n[1/4] Kiem tra Backend API...")
 try:
-    with urllib.request.urlopen(f"http://127.0.0.1:{API_PORT}/api/status", timeout=6) as resp:
+    with urllib.request.urlopen("http://127.0.0.1:{}/api/status".format(API_PORT), timeout=6) as resp:
         data = json.loads(resp.read().decode())
     print("  -> API Backend: HOAT DONG TOT (200 OK)")
 except Exception as e:
-    print(f"  -> API Backend LOI: {e}")
+    print("  -> API Backend LOI: {}".format(e))
     sys.exit(1)
 
 nodes = data.get("nodes", [])
 ready_nodes = [n for n in nodes if n.get("ready")]
 unique_ips = set(n.get("current_ip") for n in ready_nodes if n.get("current_ip"))
 
-print(f"\n[2/4] Danh sach Worker (Tong so: {len(nodes)}, READY: {len(ready_nodes)})...")
+print("\n[2/4] Danh sach Worker (Tong so: {}, READY: {})...".format(len(nodes), len(ready_nodes)))
 print("-" * 75)
-print(f"{'WORKER':<10} {'READY':<8} {'EXIT IP':<18} {'UPTIME':<10} {'ROTATIONS':<10} {'COUNTRY'}")
+print("{:<10} {:<8} {:<18} {:<10} {:<10} {}".format('WORKER', 'READY', 'EXIT IP', 'UPTIME', 'ROTATIONS', 'COUNTRY'))
 print("-" * 75)
 
 over_70s_count = 0
@@ -55,7 +55,7 @@ for n in nodes:
     ready = "YES" if n.get("ready") else "NO"
     ip = n.get("current_ip") or "N/A"
     uptime_sec = n.get("uptime_seconds")
-    uptime_str = f"{uptime_sec}s" if uptime_sec is not None else "N/A"
+    uptime_str = "{}s".format(uptime_sec) if uptime_sec is not None else "N/A"
     rot_cnt = n.get("rotation_count", 0)
     country = n.get("country") or n.get("country_hint") or ""
     
@@ -63,40 +63,40 @@ for n in nodes:
         over_70s_count += 1
         uptime_str += " (!>70s)"
         
-    print(f"{wid:<10} {ready:<8} {ip:<18} {uptime_str:<10} {rot_cnt:<10} {country}")
+    print("{:<10} {:<8} {:<18} {:<10} {:<10} {}".format(wid, ready, ip, uptime_str, rot_cnt, country))
 
 print("-" * 75)
-print(f"Tong so Worker READY: {len(ready_nodes)} / {len(nodes)}")
-print(f"Tong so IP VPN doc lap (Unique IPs): {len(unique_ips)}")
+print("Tong so Worker READY: {} / {}".format(len(ready_nodes), len(nodes)))
+print("Tong so IP VPN doc lap (Unique IPs): {}".format(len(unique_ips)))
 if len(unique_ips) >= 20:
     print("  => DAT YEU CAU: Cung cap tren 20 IP khac nhau!")
 else:
-    print(f"  => Dang ket noi them worker (Hien co {len(unique_ips)}/20+ IP)")
+    print("  => Dang ket noi them worker (Hien co {}/20+ IP)".format(len(unique_ips)))
 
 if over_70s_count == 0:
     print("  => DAT YEU CAU: Khong co IP nao ton tai qua 70 giay!")
 else:
-    print(f"  => Thong tin: Co {over_70s_count} IP dang trong tien trinh xoay vi uptime > 70s")
+    print("  => Thong tin: Co {} IP dang trong tien trinh xoay vi uptime > 70s".format(over_70s_count))
 
-print(f"\n[3/4] Test 5 requests qua SOCKS5 Gateway (port {PROXY_PORT})...")
+print("\n[3/4] Test 5 requests qua SOCKS5 Gateway (port {})...".format(PROXY_PORT))
 proxy_ips = []
 for r in range(1, 6):
     try:
         res = subprocess.run(
-            ["curl", "-s", "-m", "8", "-x", f"socks5h://{PROXY_USER}:{PROXY_PASS}@127.0.0.1:{PROXY_PORT}", "https://api.ipify.org"],
+            ["curl", "-s", "-m", "8", "-x", "socks5h://{}:{}@127.0.0.1:{}".format(PROXY_USER, PROXY_PASS, PROXY_PORT), "https://api.ipify.org"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=10
         )
         out_ip = res.stdout.strip()
         if res.returncode == 0 and out_ip and "." in out_ip:
             proxy_ips.append(out_ip)
-            print(f"  Request #{r}: OK -> Exit IP: {out_ip}")
+            print("  Request #{}: OK -> Exit IP: {}".format(r, out_ip))
         else:
-            print(f"  Request #{r}: Cho ket noi / Dang xoay IP")
+            print("  Request #{}: Cho ket noi / Dang xoay IP".format(r))
     except Exception as exc:
-        print(f"  Request #{r}: Timeout ({exc})")
+        print("  Request #{}: Timeout ({})".format(r, exc))
     time.sleep(0.3)
 
-print(f"So IP khac nhau thu duoc qua 5 requests: {len(set(proxy_ips))}")
+print("So IP khac nhau thu duoc qua 5 requests: {}".format(len(set(proxy_ips))))
 
 print("\n[4/4] Tai nguyen may chu:")
 subprocess.run("uptime", shell=True)

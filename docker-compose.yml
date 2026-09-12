@@ -2,6 +2,7 @@ x-vpn-worker: &vpn_worker
   image: ${WORKER_IMAGE:-piactl-socks5-proxy:local}
   security_opt:
     - apparmor:unconfined
+    - seccomp:unconfined
   env_file:
     - .env
   expose:
@@ -461,6 +462,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: pia-socks5-api
+    security_opt:
+      - seccomp:unconfined
     mem_limit: 512m
     env_file:
       - .env

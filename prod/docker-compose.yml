@@ -2,6 +2,7 @@ x-vpn-worker: &vpn_worker
   image: ${WORKER_IMAGE:-ghcr.io/videoveo3pro-debug/pia-worker:latest}
   security_opt:
     - apparmor:unconfined
+    - seccomp:unconfined
   env_file:
     - .env
   expose:
@@ -455,6 +456,8 @@ services:
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/videoveo3pro-debug/pia-backend:latest}
     container_name: pia-socks5-api
+    security_opt:
+      - seccomp:unconfined
     mem_limit: 256m
     env_file:
       - .env
