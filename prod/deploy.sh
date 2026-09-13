@@ -68,8 +68,8 @@ fi
 
 # Doc so luong worker tu .env
 ENV_FILE="${PROD_DIR}/.env"
-WORKER_COUNT=$(grep -E '^WORKER_COUNT=' "${ENV_FILE}" | cut -d'=' -f2 | tr -d ' ' || echo "38")
-WORKER_COUNT="${WORKER_COUNT:-38}"
+WORKER_COUNT=$(grep -E '^WORKER_COUNT=' "${ENV_FILE}" | cut -d'=' -f2 | tr -d ' ' || echo "32")
+WORKER_COUNT="${WORKER_COUNT:-32}"
 BACKEND_IMG=$(grep -E '^BACKEND_IMAGE=' "${ENV_FILE}" | cut -d'=' -f2 | tr -d ' ' || echo "ghcr.io/videoveo3pro-debug/pia-backend:latest")
 WORKER_IMG=$(grep -E '^WORKER_IMAGE=' "${ENV_FILE}" | cut -d'=' -f2 | tr -d ' ' || echo "ghcr.io/videoveo3pro-debug/pia-worker:latest")
 
