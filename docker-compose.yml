@@ -40,12 +40,12 @@ services:
       - |
         mkdir -p /run/haproxy
         chmod 777 /run/haproxy
-        worker_count="$${WORKER_COUNT:-32}"
+        worker_count="$${WORKER_COUNT:-38}"
         case "$$worker_count" in
-          ''|*[!0-9]*) worker_count=32 ;;
+          ''|*[!0-9]*) worker_count=38 ;;
           *)
-            if [ "$$worker_count" -gt 32 ]; then
-              worker_count=32
+            if [ "$$worker_count" -gt 48 ]; then
+              worker_count=48
             elif [ "$$worker_count" -lt 1 ]; then
               worker_count=8
             fi
@@ -102,8 +102,8 @@ services:
     env_file:
       - .env
     environment:
-      WORKER_COUNT: ${WORKER_COUNT:-32}
-      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-32}
+      WORKER_COUNT: ${WORKER_COUNT:-38}
+      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-38}
     ports:
       - "${PROXY_HOST:-127.0.0.1}:${PROXY_PORT:-1087}:1080"
       - "127.0.0.1:${HAPROXY_STATS_PORT:-8411}:8404"
@@ -456,6 +456,54 @@ services:
       WORKER_ID: worker32
       PIA_STARTUP_TARGET: ${WORKER_32_COUNTRY:-random}
 
+  vpn-worker-33:
+    <<: *vpn_worker
+    container_name: pia-worker-33
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker33
+      PIA_STARTUP_TARGET: ${WORKER_33_COUNTRY:-random}
+
+  vpn-worker-34:
+    <<: *vpn_worker
+    container_name: pia-worker-34
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker34
+      PIA_STARTUP_TARGET: ${WORKER_34_COUNTRY:-random}
+
+  vpn-worker-35:
+    <<: *vpn_worker
+    container_name: pia-worker-35
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker35
+      PIA_STARTUP_TARGET: ${WORKER_35_COUNTRY:-random}
+
+  vpn-worker-36:
+    <<: *vpn_worker
+    container_name: pia-worker-36
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker36
+      PIA_STARTUP_TARGET: ${WORKER_36_COUNTRY:-random}
+
+  vpn-worker-37:
+    <<: *vpn_worker
+    container_name: pia-worker-37
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker37
+      PIA_STARTUP_TARGET: ${WORKER_37_COUNTRY:-random}
+
+  vpn-worker-38:
+    <<: *vpn_worker
+    container_name: pia-worker-38
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker38
+      PIA_STARTUP_TARGET: ${WORKER_38_COUNTRY:-random}
+
   backend:
     image: ${BACKEND_IMAGE:-piactl-socks5-gateway:local}
     build:
@@ -475,8 +523,8 @@ services:
       PIA_ACCOUNT_PATH_2: /app/credentials/pia_account_2
       PROXY_SERVICE_HOST: proxy-gateway
       HAPROXY_RUNTIME_SOCKET: /run/haproxy/admin.sock
-      WORKER_COUNT: ${WORKER_COUNT:-32}
-      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-32}
+      WORKER_COUNT: ${WORKER_COUNT:-38}
+      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-38}
       PROXY_WORKERS: ${PROXY_WORKERS:-auto}
       DOCKER_SOCKET_PATH: /var/run/docker.sock
     ports:
