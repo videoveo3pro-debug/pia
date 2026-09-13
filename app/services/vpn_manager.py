@@ -1218,6 +1218,7 @@ class VPNManager:
                     "gateway_reenabled": True,
                 }
             self._disable_node(node, reason="rotate_start")
+            time.sleep(1.5)
             self._last_verified_at.pop(node.id, None)
             self._last_verified_ip.pop(node.id, None)
             self._ready_state[node.id] = False
@@ -1266,6 +1267,7 @@ class VPNManager:
                     self._node_status_cache[node.id]["uptime_seconds"] = 0
                 self._record_country_result(target_key, ok=True, error=None)
                 self._record_server_result(vpn.actual_server, ok=True, error=None)
+                time.sleep(0.5)
                 self._enable_node(node, reason="rotate_success")
                 elapsed_ms = int((time.perf_counter() - started) * 1000)
                 return {
@@ -2198,6 +2200,24 @@ class VPNManager:
                 return ip
         return None
 
+    def _host_ip(self) -> str | None:
+        if not hasattr(self, "_cached_host_ip"):
+            self._cached_host_ip = os.getenv("HOST_IP", "").strip() or None
+            if not self._cached_host_ip:
+                for ep in ["https://api.ipify.org", "https://icanhazip.com"]:
+                    try:
+                        r = requests.get(ep, timeout=3)
+                        if r.ok and r.text.strip():
+                            self._cached_host_ip = r.text.strip()
+                            break
+                    except Exception:
+                        pass
+        return self._cached_host_ip
+
+    def _is_host_leak(self, ip: str) -> bool:
+        host = self._host_ip()
+        return bool(host and ip == host)
+
     def _ip_check_with_proxy(self, proxy_url: str, *, timeout: int | float) -> tuple[str | None, str | None]:
         proxies = {"http": proxy_url, "https": proxy_url}
         last_error = None
@@ -2216,6 +2236,9 @@ class VPNManager:
                     m = re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", text)
                     ip = m.group(0) if m else None
                 if ip:
+                    if self._is_host_leak(ip):
+                        last_error = f"{endpoint}: host IP leak detected ({ip})"
+                        continue
                     return ip, None
                 last_error = f"{endpoint}: could not parse IP"
             except Exception as exc:
@@ -2324,7 +2347,11 @@ class VPNManager:
 
     def _sync_ready_gateway_pool(self, nodes: list[dict[str, Any]]) -> dict[str, Any]:
         active_ids = {node.id for node in self._active_nodes()}
-        ready_ids = {n["id"] for n in nodes if n.get("active") and n.get("ready")}
+        in_flight_ids = set(self._auto_rotate_running_ids()) | set(self._recovery_running_ids())
+        ready_ids = {
+            n["id"] for n in nodes
+            if n.get("active") and n.get("ready") and n.get("id") not in in_flight_ids
+        }
         results = []
         for node in self.nodes:
             if node.id in ready_ids and node.id in active_ids:
