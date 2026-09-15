@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pia-proxy"
-version = "1.0.8"
+version = "1.0.9"
 description = "High-Performance PIA SOCKS5 Multi-Worker Proxy Gateway CLI"
 readme = "README.md"
 license = { text = "MIT" }

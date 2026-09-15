@@ -65,6 +65,19 @@ def doctor_cmd(obj: dict[str, Any]) -> None:
     else:
         table.add_row("TUN Device", Text("✗ MISSING", style="bold red"), "Run 'mkdir -p /dev/net && mknod /dev/net/tun c 10 200'")
 
+    # 3.5. WireGuard Kernel Module
+    wg_ok = Path("/sys/module/wireguard").exists()
+    if not wg_ok:
+        try:
+            subprocess.run(["modprobe", "wireguard"], capture_output=True, check=False)
+            wg_ok = Path("/sys/module/wireguard").exists()
+        except Exception:
+            pass
+    if wg_ok:
+        table.add_row("WireGuard Module", Text("✔ OK", style="bold green"), "In-kernel WireGuard active")
+    else:
+        table.add_row("WireGuard Module", Text("⚠ WARN", style="bold yellow"), "Run 'modprobe wireguard' for 10x faster VPN")
+
     # 4. RAM & Swap
     mem_ok = False
     mem_info = "Unable to read /proc/meminfo"

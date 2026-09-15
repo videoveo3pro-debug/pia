@@ -210,14 +210,17 @@ auto_login_and_connect() {
     fi
 
     if [[ "${PIA_CONNECT_ON_STARTUP:-true}" == "true" ]]; then
+        if [[ -n "${PIA_PROTOCOL:-}" && "${PIA_PROTOCOL}" != "auto" ]]; then
+            timeout -k 2 10s flock -w 5 "${PIA_CLI_LOCK_PATH}" piactl set protocol "${PIA_PROTOCOL}" >/dev/null 2>&1 || true
+        fi
         if [[ -n "$target" && "$target" != "random" && "$target" != "__random__" && "$target" != "any" && "$target" != "all" && "$target" != "auto" ]]; then
             timeout -k 2 20s flock -w 10 "${PIA_CLI_LOCK_PATH}" piactl set region "$target" >/dev/null 2>&1 || true
         else
             local fallback_regions=(
                 "us-california" "us-new-york" "us-chicago" "us-texas" "us-florida" "us-seattle" "us-atlanta" "us-denver" "us-virginia" "us-ohio"
-                "ca-ontario" "ca-toronto" "ca-vancouver" "ca-montreal" "uk-london" "uk-manchester" "germany" "france" "netherlands" "sweden"
-                "switzerland" "norway" "denmark" "finland" "austria" "belgium" "ireland" "italy" "spain" "poland"
-                "singapore" "japan" "taiwan" "south-korea" "australia" "au-sydney" "au-melbourne" "au-perth" "new-zealand" "brazil"
+                "ca-ontario" "ca-toronto" "ca-vancouver" "ca-montreal" "uk-london" "uk-manchester" "de-frankfurt" "france" "netherlands" "se-stockholm"
+                "switzerland" "norway" "denmark" "fi-helsinki" "austria" "belgium" "ireland" "it-milano" "es-madrid" "poland"
+                "singapore" "jp-tokyo" "taiwan" "south-korea" "au-sydney" "au-melbourne" "au-perth" "new-zealand" "brazil"
                 "mexico" "albania" "armenia" "cyprus" "czech-republic" "estonia" "georgia" "greece" "hungary" "iceland"
                 "india" "israel" "kazakhstan" "latvia" "lithuania" "luxembourg" "moldova" "monaco" "montenegro" "north-macedonia"
                 "portugal" "romania" "serbia" "slovakia" "slovenia" "south-africa" "turkey" "ukraine" "united-arab-emirates"

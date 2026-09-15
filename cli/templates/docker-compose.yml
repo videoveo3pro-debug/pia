@@ -21,7 +21,6 @@ x-vpn-worker: &vpn_worker
   volumes:
     - ./credentials:/app/credentials
   restart: unless-stopped
-  mem_limit: 120m
   logging:
     driver: "json-file"
     options:
@@ -87,6 +86,8 @@ services:
 
         backend socks5_workers
             balance roundrobin
+            retries 3
+            option redispatch
             default-server init-addr none resolvers docker_resolver disabled check port 1080 inter 5s fastinter 2s downinter 3s rise 1 fall 2
 
         EOF

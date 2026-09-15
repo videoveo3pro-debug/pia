@@ -50,7 +50,7 @@ def setup_cmd(
     config.update_env_value("SOCKS5_USERNAME", proxy_user)
     config.update_env_value("SOCKS5_PASSWORD", proxy_pass)
 
-    # 3. Ensure TUN device exists
+    # 3. Ensure TUN device and WireGuard module exist
     tun_path = Path("/dev/net/tun")
     if not tun_path.exists():
         try:
@@ -58,6 +58,10 @@ def setup_cmd(
             subprocess.run(["mknod", "/dev/net/tun", "c", "10", "200"], check=False)
         except Exception:
             pass
+    try:
+        subprocess.run(["modprobe", "wireguard"], check=False)
+    except Exception:
+        pass
 
     console.print(f"[bold green]✔ Đã lưu cấu hình tài khoản PIA vào {config.credentials_dir / 'pia_account_1'}[/bold green]")
     console.print(f"[bold green]✔ Cổng SOCKS5: {proxy_port} | User: {proxy_user}[/bold green]")
