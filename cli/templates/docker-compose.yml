@@ -1,0 +1,575 @@
+x-vpn-worker: &vpn_worker
+  image: ${WORKER_IMAGE:-ghcr.io/videoveo3pro-debug/pia-worker:latest}
+  security_opt:
+    - apparmor:unconfined
+    - seccomp:unconfined
+  env_file:
+    - .env
+  expose:
+    - "1080"
+    - "9000"
+  networks:
+    - pia_proxy_net
+  cap_add:
+    - NET_ADMIN
+    - NET_RAW
+    - SYS_PTRACE
+  devices:
+    - /dev/net/tun:/dev/net/tun:rwm
+  sysctls:
+    net.ipv6.conf.all.disable_ipv6: "0"
+  volumes:
+    - ./credentials:/app/credentials
+  restart: unless-stopped
+  mem_limit: 120m
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "2m"
+      max-file: "2"
+
+services:
+  proxy-gateway:
+    image: haproxy:2.9-alpine
+    container_name: pia-proxy-gateway
+    user: "0:0"
+    mem_limit: 64m
+    command:
+      - sh
+      - -ec
+      - |
+        echo "nameserver 127.0.0.11" > /etc/resolv.conf
+        mkdir -p /run/haproxy
+        chmod 777 /run/haproxy
+        worker_count="$${MAX_WORKER_COUNT:-$${WORKER_COUNT:-48}}"
+        case "$$worker_count" in
+          ''|*[!0-9]*) worker_count=48 ;;
+          *)
+            if [ "$$worker_count" -gt 64 ]; then
+              worker_count=64
+            elif [ "$$worker_count" -lt 1 ]; then
+              worker_count=48
+            fi
+            ;;
+        esac
+        cat >/tmp/haproxy.cfg <<'EOF'
+        global
+            log stdout format raw local0
+            stats socket /run/haproxy/admin.sock mode 666 level admin expose-fd listeners
+            maxconn 4096
+
+        resolvers docker_resolver
+            nameserver dns1 127.0.0.11:53
+            resolve_retries 3
+            timeout resolve 1s
+            timeout retry 1s
+            hold other 10s
+            hold refused 10s
+            hold nx 10s
+            hold timeout 10s
+            hold valid 10s
+            hold obsolete 10s
+
+        defaults
+            log global
+            mode tcp
+            option tcplog
+            retries 3
+            option redispatch
+            timeout queue 5s
+            timeout connect 5s
+            timeout client 60s
+            timeout server 60s
+
+        frontend socks5_gateway
+            bind *:1080
+            default_backend socks5_workers
+
+        backend socks5_workers
+            balance roundrobin
+            default-server init-addr none resolvers docker_resolver disabled check port 1080 inter 5s fastinter 2s downinter 3s rise 1 fall 2
+
+        EOF
+        for i in $$(seq 1 "$$worker_count"); do
+          printf '    server worker%s vpn-worker-%s:1080 check port 1080\n' "$$i" "$$i" >>/tmp/haproxy.cfg
+        done
+        cat >>/tmp/haproxy.cfg <<'EOF'
+        listen stats
+            bind *:8404
+            mode http
+            stats enable
+            stats uri /
+            stats refresh 5s
+        EOF
+        exec haproxy -W -db -f /tmp/haproxy.cfg
+    env_file:
+      - .env
+    environment:
+      WORKER_COUNT: ${WORKER_COUNT:-32}
+      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-32}
+    ports:
+      - "${PROXY_HOST:-0.0.0.0}:${PROXY_PORT:-1087}:1080"
+      - "${PROXY_HOST:-0.0.0.0}:${HAPROXY_STATS_PORT:-8411}:8404"
+    volumes:
+      - haproxy_runtime:/run/haproxy
+    networks:
+      - pia_proxy_net
+    depends_on:
+      vpn-worker-1:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /run/haproxy/admin.sock"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "2m"
+        max-file: "2"
+
+  vpn-worker-1:
+    <<: *vpn_worker
+    container_name: pia-worker-1
+    environment: &worker_env
+      WORKER_ID: worker1
+      TOKEN_SLOT: "1"
+      CREDENTIALS_CONTAINER_PATH: /app/credentials
+      PIA_ACCOUNT: ""
+      PIA_ACCOUNT_STORAGE_ENABLED: "true"
+      PIA_ACCOUNT_PATH: /app/credentials/pia_account_1
+      PROXY_LOG_PATH: /tmp/proxy-runtime.log
+      PROXY_CONTROL_PORT: ${PROXY_CONTROL_PORT:-9000}
+      SOCKS5_PORT: ${SOCKS5_PORT:-1080}
+      PIA_CONNECT_ON_STARTUP: ${PIA_CONNECT_ON_STARTUP:-true}
+      PIA_STARTUP_TARGET: ${WORKER_1_COUNTRY:-random}
+
+  vpn-worker-2:
+    <<: *vpn_worker
+    container_name: pia-worker-2
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker2
+      PIA_STARTUP_TARGET: ${WORKER_2_COUNTRY:-random}
+
+  vpn-worker-3:
+    <<: *vpn_worker
+    container_name: pia-worker-3
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker3
+      PIA_STARTUP_TARGET: ${WORKER_3_COUNTRY:-random}
+
+  vpn-worker-4:
+    <<: *vpn_worker
+    container_name: pia-worker-4
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker4
+      PIA_STARTUP_TARGET: ${WORKER_4_COUNTRY:-random}
+
+  vpn-worker-5:
+    <<: *vpn_worker
+    container_name: pia-worker-5
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker5
+      PIA_STARTUP_TARGET: ${WORKER_5_COUNTRY:-random}
+
+  vpn-worker-6:
+    <<: *vpn_worker
+    container_name: pia-worker-6
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker6
+      PIA_STARTUP_TARGET: ${WORKER_6_COUNTRY:-random}
+
+  vpn-worker-7:
+    <<: *vpn_worker
+    container_name: pia-worker-7
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker7
+      PIA_STARTUP_TARGET: ${WORKER_7_COUNTRY:-random}
+
+  vpn-worker-8:
+    <<: *vpn_worker
+    container_name: pia-worker-8
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker8
+      PIA_STARTUP_TARGET: ${WORKER_8_COUNTRY:-random}
+
+  vpn-worker-9:
+    <<: *vpn_worker
+    container_name: pia-worker-9
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker9
+      PIA_STARTUP_TARGET: ${WORKER_9_COUNTRY:-random}
+
+  vpn-worker-10:
+    <<: *vpn_worker
+    container_name: pia-worker-10
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker10
+      PIA_STARTUP_TARGET: ${WORKER_10_COUNTRY:-random}
+
+  vpn-worker-11:
+    <<: *vpn_worker
+    container_name: pia-worker-11
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker11
+      PIA_STARTUP_TARGET: ${WORKER_11_COUNTRY:-random}
+
+  vpn-worker-12:
+    <<: *vpn_worker
+    container_name: pia-worker-12
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker12
+      PIA_STARTUP_TARGET: ${WORKER_12_COUNTRY:-random}
+
+  vpn-worker-13:
+    <<: *vpn_worker
+    container_name: pia-worker-13
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker13
+      PIA_STARTUP_TARGET: ${WORKER_13_COUNTRY:-random}
+
+  vpn-worker-14:
+    <<: *vpn_worker
+    container_name: pia-worker-14
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker14
+      PIA_STARTUP_TARGET: ${WORKER_14_COUNTRY:-random}
+
+  vpn-worker-15:
+    <<: *vpn_worker
+    container_name: pia-worker-15
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker15
+      PIA_STARTUP_TARGET: ${WORKER_15_COUNTRY:-random}
+
+  vpn-worker-16:
+    <<: *vpn_worker
+    container_name: pia-worker-16
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker16
+      PIA_STARTUP_TARGET: ${WORKER_16_COUNTRY:-random}
+
+  vpn-worker-17:
+    <<: *vpn_worker
+    container_name: pia-worker-17
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker17
+      PIA_STARTUP_TARGET: ${WORKER_17_COUNTRY:-random}
+
+  vpn-worker-18:
+    <<: *vpn_worker
+    container_name: pia-worker-18
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker18
+      PIA_STARTUP_TARGET: ${WORKER_18_COUNTRY:-random}
+
+  vpn-worker-19:
+    <<: *vpn_worker
+    container_name: pia-worker-19
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker19
+      PIA_STARTUP_TARGET: ${WORKER_19_COUNTRY:-random}
+
+  vpn-worker-20:
+    <<: *vpn_worker
+    container_name: pia-worker-20
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker20
+      PIA_STARTUP_TARGET: ${WORKER_20_COUNTRY:-random}
+
+  vpn-worker-21:
+    <<: *vpn_worker
+    container_name: pia-worker-21
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker21
+      PIA_STARTUP_TARGET: ${WORKER_21_COUNTRY:-random}
+
+  vpn-worker-22:
+    <<: *vpn_worker
+    container_name: pia-worker-22
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker22
+      PIA_STARTUP_TARGET: ${WORKER_22_COUNTRY:-random}
+
+  vpn-worker-23:
+    <<: *vpn_worker
+    container_name: pia-worker-23
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker23
+      PIA_STARTUP_TARGET: ${WORKER_23_COUNTRY:-random}
+
+  vpn-worker-24:
+    <<: *vpn_worker
+    container_name: pia-worker-24
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker24
+      PIA_STARTUP_TARGET: ${WORKER_24_COUNTRY:-random}
+
+  vpn-worker-25:
+    <<: *vpn_worker
+    container_name: pia-worker-25
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker25
+      PIA_STARTUP_TARGET: ${WORKER_25_COUNTRY:-random}
+
+  vpn-worker-26:
+    <<: *vpn_worker
+    container_name: pia-worker-26
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker26
+      PIA_STARTUP_TARGET: ${WORKER_26_COUNTRY:-random}
+
+  vpn-worker-27:
+    <<: *vpn_worker
+    container_name: pia-worker-27
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker27
+      PIA_STARTUP_TARGET: ${WORKER_27_COUNTRY:-random}
+
+  vpn-worker-28:
+    <<: *vpn_worker
+    container_name: pia-worker-28
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker28
+      PIA_STARTUP_TARGET: ${WORKER_28_COUNTRY:-random}
+
+  vpn-worker-29:
+    <<: *vpn_worker
+    container_name: pia-worker-29
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker29
+      PIA_STARTUP_TARGET: ${WORKER_29_COUNTRY:-random}
+
+  vpn-worker-30:
+    <<: *vpn_worker
+    container_name: pia-worker-30
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker30
+      PIA_STARTUP_TARGET: ${WORKER_30_COUNTRY:-random}
+
+  vpn-worker-31:
+    <<: *vpn_worker
+    container_name: pia-worker-31
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker31
+      PIA_STARTUP_TARGET: ${WORKER_31_COUNTRY:-random}
+
+  vpn-worker-32:
+    <<: *vpn_worker
+    container_name: pia-worker-32
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker32
+      PIA_STARTUP_TARGET: ${WORKER_32_COUNTRY:-random}
+
+
+  vpn-worker-33:
+    <<: *vpn_worker
+    container_name: pia-worker-33
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker33
+      PIA_STARTUP_TARGET: ${WORKER_33_COUNTRY:-random}
+
+  vpn-worker-34:
+    <<: *vpn_worker
+    container_name: pia-worker-34
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker34
+      PIA_STARTUP_TARGET: ${WORKER_34_COUNTRY:-random}
+
+  vpn-worker-35:
+    <<: *vpn_worker
+    container_name: pia-worker-35
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker35
+      PIA_STARTUP_TARGET: ${WORKER_35_COUNTRY:-random}
+
+  vpn-worker-36:
+    <<: *vpn_worker
+    container_name: pia-worker-36
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker36
+      PIA_STARTUP_TARGET: ${WORKER_36_COUNTRY:-random}
+
+  vpn-worker-37:
+    <<: *vpn_worker
+    container_name: pia-worker-37
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker37
+      PIA_STARTUP_TARGET: ${WORKER_37_COUNTRY:-random}
+
+  vpn-worker-38:
+    <<: *vpn_worker
+    container_name: pia-worker-38
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker38
+      PIA_STARTUP_TARGET: ${WORKER_38_COUNTRY:-random}
+
+  vpn-worker-39:
+    <<: *vpn_worker
+    container_name: pia-worker-39
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker39
+      PIA_STARTUP_TARGET: ${WORKER_39_COUNTRY:-random}
+
+  vpn-worker-40:
+    <<: *vpn_worker
+    container_name: pia-worker-40
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker40
+      PIA_STARTUP_TARGET: ${WORKER_40_COUNTRY:-random}
+
+  vpn-worker-41:
+    <<: *vpn_worker
+    container_name: pia-worker-41
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker41
+      PIA_STARTUP_TARGET: ${WORKER_41_COUNTRY:-random}
+
+  vpn-worker-42:
+    <<: *vpn_worker
+    container_name: pia-worker-42
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker42
+      PIA_STARTUP_TARGET: ${WORKER_42_COUNTRY:-random}
+
+  vpn-worker-43:
+    <<: *vpn_worker
+    container_name: pia-worker-43
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker43
+      PIA_STARTUP_TARGET: ${WORKER_43_COUNTRY:-random}
+
+  vpn-worker-44:
+    <<: *vpn_worker
+    container_name: pia-worker-44
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker44
+      PIA_STARTUP_TARGET: ${WORKER_44_COUNTRY:-random}
+
+  vpn-worker-45:
+    <<: *vpn_worker
+    container_name: pia-worker-45
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker45
+      PIA_STARTUP_TARGET: ${WORKER_45_COUNTRY:-random}
+
+  vpn-worker-46:
+    <<: *vpn_worker
+    container_name: pia-worker-46
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker46
+      PIA_STARTUP_TARGET: ${WORKER_46_COUNTRY:-random}
+
+  vpn-worker-47:
+    <<: *vpn_worker
+    container_name: pia-worker-47
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker47
+      PIA_STARTUP_TARGET: ${WORKER_47_COUNTRY:-random}
+
+  vpn-worker-48:
+    <<: *vpn_worker
+    container_name: pia-worker-48
+    environment:
+      <<: *worker_env
+      WORKER_ID: worker48
+      PIA_STARTUP_TARGET: ${WORKER_48_COUNTRY:-random}
+
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/videoveo3pro-debug/pia-backend:latest}
+    container_name: pia-socks5-api
+    security_opt:
+      - seccomp:unconfined
+    mem_limit: 256m
+    env_file:
+      - .env
+    environment:
+      CREDENTIALS_CONTAINER_PATH: /app/credentials
+      PIA_ACCOUNT: ""
+      PIA_ACCOUNT_STORAGE_ENABLED: "true"
+      PIA_ACCOUNT_PATH: /app/credentials/pia_account_1
+      PIA_ACCOUNT_PATH_2: /app/credentials/pia_account_2
+      PROXY_SERVICE_HOST: proxy-gateway
+      HAPROXY_RUNTIME_SOCKET: /run/haproxy/admin.sock
+      WORKER_COUNT: ${WORKER_COUNT:-32}
+      MAX_WORKER_COUNT: ${MAX_WORKER_COUNT:-32}
+      PROXY_WORKERS: ${PROXY_WORKERS:-auto}
+      DOCKER_SOCKET_PATH: /var/run/docker.sock
+    ports:
+      - "${PROXY_HOST:-0.0.0.0}:${API_PORT:-8007}:8000"
+    volumes:
+      - ./credentials:/app/credentials
+      - haproxy_runtime:/run/haproxy
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - pia_proxy_net
+    depends_on:
+      proxy-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "2m"
+        max-file: "2"
+
+networks:
+  pia_proxy_net:
+    name: ${DOCKER_NETWORK:-pia_proxy_net}
+
+volumes:
+  haproxy_runtime:

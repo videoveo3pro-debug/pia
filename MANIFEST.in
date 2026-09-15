@@ -1,0 +1,28 @@
+include README.md
+include LICENSE
+include pyproject.toml
+recursive-include cli/templates *
+
+# Exclude sensitive secrets and runtime files
+prune credentials
+prune prod/credentials
+prune prod
+prune app
+prune gateway
+prune installers
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude .env
+global-exclude .env*
+include cli/templates/.env.example
+global-exclude *.json
+global-exclude *.log
+global-exclude *.sh
+global-exclude check_*.py
+global-exclude monitor_*.py
+global-exclude launch_*.py
+global-exclude run_*.py
+global-exclude verify_*.py
+global-exclude deploy_*.py
+global-exclude connect_*.py
+global-exclude debug_*.py

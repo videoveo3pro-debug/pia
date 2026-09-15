@@ -28,3 +28,6 @@ get_metrics_runner.py
 test_24_runner.py
 final_e2e_runner.py
 check_haproxy_runner.py
+dist/
+build/
+*.egg-info/
